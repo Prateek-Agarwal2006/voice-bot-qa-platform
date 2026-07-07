@@ -1,0 +1,6 @@
+apiVersion: v2
+name: voicebot-qa
+description: Voice Bot QA Platform — probe workers, eval workers, orchestrator API, and UI
+type: application
+version: 0.2.0
+appVersion: "0.2.0"

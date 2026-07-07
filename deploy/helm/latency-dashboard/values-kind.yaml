@@ -1,0 +1,36 @@
+# Kind / Colima local simulation — run deploy/kind/build-and-load.sh first.
+# Postgres runs as a pod inside the cluster. DNS: postgres-svc:5432 (same as prod).
+
+image:
+  pullPolicy: Never
+  probeWorker:
+    repository: voicebot-qa-probe-worker
+    tag: local
+  evalWorker:
+    repository: voicebot-qa-eval-worker
+    tag: local
+  orchestrator:
+    repository: voicebot-qa-orchestrator
+    tag: local
+  ui:
+    repository: voicebot-qa-ui
+    tag: local
+  postgres:
+    repository: postgres
+    tag: "16-alpine"
+
+global:
+  collectIntervalSeconds: 120
+
+evalWorker:
+  replicas: 1
+  pollIntervalSeconds: 5
+
+secrets:
+  name: voicebot-qa-secrets
+  # postgresDsn set via create-secrets.sh — do not hardcode here
+
+service:
+  ui:
+    type: NodePort
+    nodePort: 30090

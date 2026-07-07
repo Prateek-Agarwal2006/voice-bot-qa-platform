@@ -1,0 +1,45 @@
+{{- range .Values.probeWorkers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voicebot-qa.fullname" $ }}-probe-worker-{{ .name }}
+  labels:
+    {{- include "voicebot-qa.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: probe-worker
+    voicebot-qa.worker: {{ .name | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "voicebot-qa.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: probe-worker
+      voicebot-qa.worker: {{ .name | quote }}
+  template:
+    metadata:
+      labels:
+        {{- include "voicebot-qa.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: probe-worker
+        voicebot-qa.worker: {{ .name | quote }}
+    spec:
+      containers:
+        - name: probe-worker
+          image: "{{ $.Values.image.probeWorker.repository }}:{{ $.Values.image.probeWorker.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            - name: CONFIG_PATH
+              value: /config/config.json
+            - name: COLLECT_INTERVAL_SECONDS
+              value: {{ $.Values.global.collectIntervalSeconds | quote }}
+            {{- include "voicebot-qa.postgresEnv" $ | nindent 12 }}
+          volumeMounts:
+            - name: probe-config
+              mountPath: /config
+              readOnly: true
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+      volumes:
+        - name: probe-config
+          configMap:
+            name: {{ include "voicebot-qa.fullname" $ }}-probe-worker-{{ .name }}-config
+{{- end }}

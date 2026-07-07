@@ -1,0 +1,41 @@
+{
+  "config_version": "v2-llm-configs",
+  "source_region": "??????",
+  "prompt": "Respond with the single word: ok",
+  "temperature": 0,
+  "max_tokens": 1,
+  "default_n": 10,
+  "default_timeout_ms": 10000,
+  "collect_interval_seconds": 300,
+  "provider": "gen-ai-router",
+  "llm_configs": [
+    {
+      "target_id": "spain-central-dz-gpt41",
+      "label": "Spain Central · Data zone · GPT-4.1",
+      "streamEnabled": false,
+      "group": "PRATHAM_23_JUN_SPAIN_CENTRAL_DATAZONE_AZURE_4_1_TEST",
+      "deployment": "gpt-4.1-2025-04-14-spaincentral-datazone-standard",
+      "provider": "AZURE_OPEN_AI",
+      "llm_config_id": "6a3a550ec0c3ec15cdd089a5",
+      "partnerId": 16000011,
+      "useDynamicRouting": false,
+      "routerUrl": "??????",
+      "client_identifier": "backend-platform-dev",
+      "user": "latency-probe"
+    },
+    {
+      "target_id": "??????",
+      "label": "??????",
+      "streamEnabled": false,
+      "group": "??????",
+      "deployment": "??????",
+      "provider": "??????",
+      "llm_config_id": "??????",
+      "partnerId": "??????",
+      "useDynamicRouting": false,
+      "routerUrl": "??????",
+      "client_identifier": "??????",
+      "user": "latency-probe"
+    }
+  ]
+}

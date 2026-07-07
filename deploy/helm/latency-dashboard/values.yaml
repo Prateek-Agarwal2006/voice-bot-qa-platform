@@ -1,0 +1,62 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  pullPolicy: IfNotPresent
+  probeWorker:
+    repository: voicebot-qa-probe-worker
+    tag: local
+  evalWorker:
+    repository: voicebot-qa-eval-worker
+    tag: local
+  orchestrator:
+    repository: voicebot-qa-orchestrator
+    tag: local
+  ui:
+    repository: voicebot-qa-ui
+    tag: local
+  postgres:
+    repository: postgres
+    tag: "16-alpine"
+
+global:
+  collectIntervalSeconds: 300
+
+probeWorkers:
+  - name: eastus
+    configFile: config.json
+  - name: westeurope
+    configFile: config-westeurope.json
+
+evalWorker:
+  replicas: 1
+  pollIntervalSeconds: 5
+
+orchestrator:
+  port: 8002
+  configFile: config.json
+  replicas: 1
+
+ui:
+  port: 8080
+  replicas: 1
+
+postgres:
+  database: voicebot
+  user: voicebot
+  port: 5432
+  storage: 10Gi
+
+secrets:
+  name: voicebot-qa-secrets
+
+service:
+  orchestrator:
+    type: ClusterIP
+    port: 8002
+  ui:
+    type: NodePort
+    port: 8080
+    nodePort: 30080
+
+resources: {}

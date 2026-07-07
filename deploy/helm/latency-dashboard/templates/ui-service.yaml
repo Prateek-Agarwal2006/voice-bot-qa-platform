@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "voicebot-qa.fullname" . }}-ui
+  labels:
+    {{- include "voicebot-qa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+spec:
+  type: {{ .Values.service.ui.type }}
+  selector:
+    {{- include "voicebot-qa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+  ports:
+    - name: http
+      port: {{ .Values.service.ui.port }}
+      targetPort: http
+      {{- if and (eq .Values.service.ui.type "NodePort") .Values.service.ui.nodePort }}
+      nodePort: {{ .Values.service.ui.nodePort }}
+      {{- end }}

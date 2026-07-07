@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voicebot-qa.fullname" . }}-orchestrator
+  labels:
+    {{- include "voicebot-qa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+spec:
+  replicas: {{ .Values.orchestrator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "voicebot-qa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: orchestrator
+  template:
+    metadata:
+      labels:
+        {{- include "voicebot-qa.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: "{{ .Values.image.orchestrator.repository }}:{{ .Values.image.orchestrator.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.orchestrator.port }}
+          env:
+            - name: CONFIG_PATH
+              value: /config/config.json
+            {{- include "voicebot-qa.postgresEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: probe-config
+              mountPath: /config
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: probe-config
+          configMap:
+            name: {{ include "voicebot-qa.fullname" . }}-orchestrator-config
