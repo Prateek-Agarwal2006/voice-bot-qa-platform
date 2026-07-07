@@ -10,7 +10,8 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM nginx:1.29-alpine
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && \
+    apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main --upgrade libxml2
 
 COPY deploy/docker/nginx-ui.conf /etc/nginx/templates/default.conf.template
 ENV ORCHESTRATOR_UPSTREAM=latency-dashboard-orchestrator:8002
