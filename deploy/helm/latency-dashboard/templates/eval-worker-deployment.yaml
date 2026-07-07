@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voicebot-qa.fullname" . }}-eval-worker
+  labels:
+    {{- include "voicebot-qa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: eval-worker
+spec:
+  replicas: {{ .Values.evalWorker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "voicebot-qa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: eval-worker
+  template:
+    metadata:
+      labels:
+        {{- include "voicebot-qa.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: eval-worker
+    spec:
+      containers:
+        - name: eval-worker
+          image: "{{ .Values.image.evalWorker.repository }}:{{ .Values.image.evalWorker.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: EVAL_POLL_INTERVAL_S
+              value: {{ .Values.evalWorker.pollIntervalSeconds | quote }}
+            {{- include "voicebot-qa.postgresEnv" . | nindent 12 }}
+            {{- include "voicebot-qa.apiKeysEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

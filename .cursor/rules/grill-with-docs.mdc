@@ -1,0 +1,16 @@
+---
+description: When grilling or /grill-with-docs — show Grill Board every turn; plan before code; no implementation until user asks
+alwaysApply: false
+---
+
+# Grill-with-docs workflow
+
+Applies when the user triggers `/grill-with-docs`, `/grilling`, or "grill" on a design/plan.
+
+1. Show an updated **Grill Board** table at the start of every response (`✓` locked, `?` open).
+2. Ask **one** question per turn with a recommended answer.
+3. Use `/domain-modeling` — update `CONTEXT.md` / ADRs as decisions land.
+4. When grilling is complete, output an **Implementation plan** (goal, locked decisions, steps, test plan). **Do not write code.**
+5. Implement only after the user explicitly requests it (e.g. "implement", "go ahead", "build it").
+
+Read `.agents/skills/grill-with-docs/SKILL.md` for the full format.

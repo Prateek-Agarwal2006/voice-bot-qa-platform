@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "voicebot-qa.fullname" . }}-orchestrator
+  labels:
+    {{- include "voicebot-qa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+spec:
+  type: {{ .Values.service.orchestrator.type }}
+  selector:
+    {{- include "voicebot-qa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+  ports:
+    - name: http
+      port: {{ .Values.service.orchestrator.port }}
+      targetPort: http

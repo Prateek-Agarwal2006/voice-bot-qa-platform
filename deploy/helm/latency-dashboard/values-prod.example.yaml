@@ -1,0 +1,36 @@
+# Production overrides — copy to values-prod.yaml and customize.
+# Do not commit secrets. Use with:
+#   helm upgrade --install latency-dashboard . \
+#     -f values.yaml -f values-prod.yaml -n latency-dashboard
+
+image:
+  pullPolicy: IfNotPresent
+  worker:
+    repository: YOUR_REGISTRY/latency-dashboard-worker
+    tag: "1.0.0"
+  orchestrator:
+    repository: YOUR_REGISTRY/latency-dashboard-orchestrator
+    tag: "1.0.0"
+  ui:
+    repository: YOUR_REGISTRY/latency-dashboard-ui
+    tag: "1.0.0"
+
+global:
+  resultSink: snowflake
+  collectIntervalSeconds: 300
+
+workers:
+  - name: eastus
+    configFile: config.json
+  # Add one worker per source region, each with its own configFile.
+
+orchestrator:
+  runsStore: snowflake
+
+snowflake:
+  secretName: latency-dashboard-snowflake
+
+service:
+  ui:
+    type: ClusterIP
+    nodePort: 30080

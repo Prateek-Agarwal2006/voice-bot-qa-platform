@@ -1,0 +1,38 @@
+{{/* Probe worker config per region */}}
+{{- range .Values.probeWorkers }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "voicebot-qa.fullname" $ }}-probe-worker-{{ .name }}-config
+  labels:
+    {{- include "voicebot-qa.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: probe-worker
+data:
+  config.json: |
+{{ $.Files.Get (printf "config/%s" .configFile) | indent 4 }}
+{{- end }}
+---
+{{/* Orchestrator config */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "voicebot-qa.fullname" . }}-orchestrator-config
+  labels:
+    {{- include "voicebot-qa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+data:
+  config.json: |
+{{ .Files.Get (printf "config/%s" .Values.orchestrator.configFile) | indent 4 }}
+---
+{{/* Postgres init script — schema.sql run on first container startup */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "voicebot-qa.fullname" . }}-schema
+  labels:
+    {{- include "voicebot-qa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+data:
+  schema.sql: |
+{{ .Files.Get "files/schema.sql" | indent 4 }}

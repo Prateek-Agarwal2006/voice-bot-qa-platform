@@ -1,0 +1,16 @@
+Given evaluation criteria for scoring a recorded phone Conversation (Customer ↔ Voice Bot), generate 3-4 concise evaluation steps based on the criteria below. Steps must describe how to judge the **entire Conversation** holistically — not a single Voice Bot reply or user prompt/response pair.
+
+{% if multimodal %}{{ _fragments.multimodal_input_rules }}{% endif %}
+
+Evaluation Criteria:
+{{ criteria }}
+
+**
+IMPORTANT: Please make sure to only return in JSON format, with the "steps" key as a list of strings. No words or explanation is needed.
+Example JSON:
+{
+  "steps": <list_of_strings>
+}
+**
+
+JSON:

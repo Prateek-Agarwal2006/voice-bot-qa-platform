@@ -1,0 +1,21 @@
+Voice Bot QA Platform — {{ .Release.Name }} installed.
+
+Namespace: {{ .Release.Namespace }}
+
+Before pods start, ensure the secret exists:
+  ./deploy/kind/create-secrets.sh   (kind)
+  or set secrets.postgresDsn via --set / values-prod.yaml (prod)
+
+UI:
+{{- if eq .Values.service.ui.type "NodePort" }}
+  http://127.0.0.1:{{ .Values.service.ui.nodePort }}
+{{- else }}
+  kubectl port-forward svc/{{ include "voicebot-qa.fullname" . }}-ui 8080:{{ .Values.service.ui.port }}
+  http://127.0.0.1:8080
+{{- end }}
+
+Orchestrator health:
+  kubectl port-forward svc/{{ include "voicebot-qa.fullname" . }}-orchestrator 8002:{{ .Values.service.orchestrator.port }}
+  curl http://127.0.0.1:8002/api/health
+
+See deploy/kind/README.md for the full local workflow.
