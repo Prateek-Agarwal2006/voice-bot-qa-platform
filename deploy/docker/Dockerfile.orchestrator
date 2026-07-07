@@ -7,6 +7,7 @@ COPY backend/requirements-orchestrator.txt ./requirements-orchestrator.txt
 RUN pip install --no-cache-dir -r requirements-orchestrator.txt
 
 COPY backend/latency_dashboard ./latency_dashboard
+COPY backend/schema.sql ./schema.sql
 COPY config ./config
 
 ENV PYTHONPATH=/app

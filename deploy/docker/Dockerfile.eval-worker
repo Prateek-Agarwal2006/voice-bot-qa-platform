@@ -7,6 +7,7 @@ COPY backend/requirements-eval-worker.txt ./requirements-eval-worker.txt
 RUN pip install --no-cache-dir -r requirements-eval-worker.txt
 
 COPY backend/latency_dashboard ./latency_dashboard
+COPY backend/schema.sql ./schema.sql
 COPY backend/rubrics ./rubrics
 
 ENV PYTHONPATH=/app
