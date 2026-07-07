@@ -1,9 +1,34 @@
-data/
-backend/.venv/
+# Dependencies
 frontend/node_modules/
+backend/.venv/
+
+# Build output
 frontend/dist/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+deploy/helm/latency-dashboard/values-prod.yaml
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Editor / AI tools
+.claude/
+.cursor/
+.agents/
+
+# OS
 .DS_Store
-.env
-deploy/helm/latency-dashboard/values-prod.yaml
+Thumbs.db
+
+# Data
+data/
+
+# Logs
+*.log
