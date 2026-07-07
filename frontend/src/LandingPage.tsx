@@ -59,13 +59,18 @@ export function LandingPage({ onEnter }: Props) {
       markerColor: [0.22, 0.85, 1.0 ],
       glowColor:   [0.20, 0.55, 1.0 ],
       markers: MARKERS,
-      onRender(state) {
-        state.phi = phiRef.current;
-        phiRef.current += 0.003;
-      },
     });
 
+    let rafId: number;
+    const spin = () => {
+      phiRef.current += 0.003;
+      globe.update({ phi: phiRef.current });
+      rafId = requestAnimationFrame(spin);
+    };
+    rafId = requestAnimationFrame(spin);
+
     return () => {
+      cancelAnimationFrame(rafId);
       globe.destroy();
       // Remove cobe's wrapper div and restore canvas to its original parent
       // so StrictMode's second mount starts with a clean DOM.
