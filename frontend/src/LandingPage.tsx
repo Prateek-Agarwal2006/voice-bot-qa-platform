@@ -1,130 +1,146 @@
-import createGlobe from "cobe";
+import Globe from "react-globe.gl";
 import { useEffect, useRef, useState } from "react";
 
 type TabTarget = "latency" | "evaluations";
+interface Props { onEnter: (tab: TabTarget) => void; }
 
-interface Props {
-  onEnter: (tab: TabTarget) => void;
-}
+const SRC_LAT = 40.7, SRC_LNG = -74.0;
 
-const MARKERS: { location: [number, number]; size: number }[] = [
-  { location: [38.9,  -77.0 ], size: 0.10 }, // US East (source)
-  { location: [45.5,  -122.7], size: 0.05 }, // US West
-  { location: [53.3,  -6.3  ], size: 0.07 }, // EU West
-  { location: [50.1,   8.7  ], size: 0.06 }, // EU Central
-  { location: [35.7,  139.7 ], size: 0.07 }, // Tokyo
-  { location: [1.3,   103.8 ], size: 0.06 }, // Singapore
-  { location: [19.1,  72.9  ], size: 0.06 }, // Mumbai
-  { location: [-23.5, -46.6 ], size: 0.06 }, // Sao Paulo
-  { location: [-33.9, 151.2 ], size: 0.06 }, // Sydney
+const ARCS = [
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat:  37.7, endLng: -122.4 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat:  51.5, endLng:   -0.1 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat:  50.1, endLng:    8.7 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat:  35.7, endLng:  139.7 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat:   1.3, endLng:  103.8 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat:  19.1, endLng:   72.9 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat: -23.5, endLng:  -46.6 },
+  { startLat: SRC_LAT, startLng: SRC_LNG, endLat: -33.9, endLng:  151.2 },
 ];
 
-const SIZE_BIG   = 620; // phase 0 display px
-const SIZE_SMALL = 480; // phase 1 display px
+const POINTS = [
+  { lat: SRC_LAT, lng: SRC_LNG,  size: 0.6 },
+  { lat:  37.7,   lng: -122.4,   size: 0.4 },
+  { lat:  51.5,   lng:   -0.1,   size: 0.4 },
+  { lat:  50.1,   lng:    8.7,   size: 0.4 },
+  { lat:  35.7,   lng:  139.7,   size: 0.4 },
+  { lat:   1.3,   lng:  103.8,   size: 0.4 },
+  { lat:  19.1,   lng:   72.9,   size: 0.4 },
+  { lat: -23.5,   lng:  -46.6,   size: 0.4 },
+  { lat: -33.9,   lng:  151.2,   size: 0.4 },
+];
+
+const SIZE = 620;
 
 export function LandingPage({ onEnter }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const phiRef    = useRef(0.5);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const globeRef = useRef<any>(null);
   const [phase,   setPhase]   = useState<0 | 1 | 2>(0);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 2000);
-    const t2 = setTimeout(() => setPhase(2), 3600);
+    const t2 = setTimeout(() => setPhase(2), 3350);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    // Grab the original parent BEFORE cobe moves the canvas into its own wrapper div.
-    // cobe does: parent.insertBefore(wrapperDiv, canvas); wrapperDiv.append(canvas)
-    // We need to undo this in cleanup so StrictMode double-mount doesn't stack wrappers.
-    const originalParent = canvas.parentElement!;
-
-    const DPR = Math.min(window.devicePixelRatio ?? 1, 2);
-
-    const globe = createGlobe(canvas, {
-      devicePixelRatio: DPR,
-      width:  SIZE_BIG,
-      height: SIZE_BIG,
-      phi:    0.5,
-      theta:  0.3,
-      dark:         0,     // fully lit so sphere is visible against black bg
-      diffuse:      1.8,
-      mapSamples:   16000,
-      mapBrightness: 10,
-      baseColor:   [0.08, 0.22, 0.50],  // deep ocean blue
-      markerColor: [0.22, 0.85, 1.0 ],
-      glowColor:   [0.20, 0.55, 1.0 ],
-      markers: MARKERS,
-    });
-
-    let rafId: number;
-    const spin = () => {
-      phiRef.current += 0.003;
-      globe.update({ phi: phiRef.current });
-      rafId = requestAnimationFrame(spin);
-    };
-    rafId = requestAnimationFrame(spin);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      globe.destroy();
-      // Remove cobe's wrapper div and restore canvas to its original parent
-      // so StrictMode's second mount starts with a clean DOM.
-      const cobeWrapper = canvas.parentElement;
-      if (cobeWrapper && cobeWrapper !== originalParent) {
-        originalParent.appendChild(canvas);
-        cobeWrapper.remove();
-      }
-    };
+    if (!globeRef.current) return;
+    globeRef.current.controls().autoRotate      = true;
+    globeRef.current.controls().autoRotateSpeed = 0.7;
+    globeRef.current.pointOfView({ lat: 20, lng: -30, altitude: 2.0 }, 0);
   }, []);
 
   function handleEnter(tab: TabTarget) {
     setExiting(true);
-    setTimeout(() => onEnter(tab), 550);
+    setTimeout(() => onEnter(tab), 700);
   }
 
-  const displaySize = phase >= 1 ? SIZE_SMALL : SIZE_BIG;
-  const canvasStyle: React.CSSProperties = {
-    width:      displaySize,
-    height:     displaySize,
-    maxWidth:   "100%",
-    aspectRatio: "1",
-    transition: "width 0.85s cubic-bezier(0.4,0,0.2,1), height 0.85s cubic-bezier(0.4,0,0.2,1)",
-  };
-
   return (
-    <div className={`landing-root${exiting ? " landing-exit" : ""}`}>
-      <div className={`landing-layout${phase >= 1 ? " landing-layout-split" : ""}`}>
+    <div style={{
+      position: "fixed", inset: 0, background: "#000", overflow: "hidden",
+      fontFamily: "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      opacity: exiting ? 0 : 1, transition: "opacity 0.7s ease",
+    }}>
 
-        {/* ── Text LEFT ─────────────────────────────────────────────────── */}
-        <div className={`landing-content${phase >= 1 ? " landing-content-in" : ""}`}>
-          <p className="landing-label">Voice Bot QA Platform</p>
-          <h1 className="landing-title">
-            <span className="landing-word-a">VoiceBot</span>
-            <span className="landing-word-b">QA Platform</span>
-          </h1>
-          <p className="landing-sub">Measure speed. Score quality.</p>
+      {/* Globe */}
+      <div style={{
+        position: "absolute", top: "50%", left: "50%",
+        width: `${SIZE}px`, height: `${SIZE}px`,
+        marginTop: `-${SIZE / 2}px`, marginLeft: `-${SIZE / 2}px`,
+        transition: "transform 1.3s cubic-bezier(0.4,0,0.2,1)",
+        transform: phase >= 1 ? "translateX(27vw) scale(0.82)" : "translateX(0) scale(1)",
+        pointerEvents: "none",
+        overflow: "hidden",
+      }}>
+        <Globe
+          ref={globeRef}
+          width={SIZE}
+          height={SIZE}
+          backgroundColor="rgba(0,0,0,0)"
+          globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
+          showAtmosphere={true}
+          atmosphereColor="#38bdf8"
+          atmosphereAltitude={0.18}
+          pointsData={POINTS}
+          pointColor={() => "#38bdf8"}
+          pointRadius={(d: { size?: number }) => d.size ?? 0.4}
+          pointAltitude={0.01}
+          arcsData={ARCS}
+          arcColor={() => "#38bdf8"}
+          arcAltitude={0.5}
+          arcDashLength={0.35}
+          arcDashGap={0.65}
+          arcDashAnimateTime={2800}
+          arcStroke={0.6}
+        />
+      </div>
 
-          <div className={`landing-nav${phase >= 2 ? " landing-nav-in" : ""}`}>
-            <button className="landing-btn" onClick={() => handleEnter("latency")}>
-              Latency Dashboard →
-            </button>
-            <button className="landing-btn landing-btn-primary" onClick={() => handleEnter("evaluations")}>
-              Evaluations →
-            </button>
+      {/* Text – flies in from left */}
+      <div style={{
+        position: "absolute", left: "8%", top: "50%", width: "44%",
+        transform: phase >= 1 ? "translateY(-50%) translateX(0)" : "translateY(-50%) translateX(-72px)",
+        opacity: phase >= 1 ? 1 : 0,
+        transition: "opacity 0.95s ease 0.1s, transform 0.95s cubic-bezier(0.4,0,0.2,1) 0.1s",
+      }}>
+
+        <div style={{ fontSize: 11, letterSpacing: "0.28em", color: "#38bdf8", fontWeight: 600, textTransform: "uppercase", marginBottom: 22 }}>
+          Voice Bot QA Platform
+        </div>
+
+        <div style={{ lineHeight: 0.97, marginBottom: 22, letterSpacing: "-0.03em" }}>
+          <div style={{ fontSize: "clamp(44px,5.6vw,80px)", fontWeight: 800, whiteSpace: "nowrap", background: "linear-gradient(120deg,#ffffff 0%,#bfdbfe 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+            VoiceBot
+          </div>
+          <div style={{ fontSize: "clamp(44px,5.6vw,80px)", fontWeight: 800, whiteSpace: "nowrap", background: "linear-gradient(120deg,#38bdf8 0%,#a855f7 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+            QA Platform
           </div>
         </div>
 
-        {/* ── Globe RIGHT ───────────────────────────────────────────────── */}
-        <div className="landing-globe-wrap">
-          <canvas ref={canvasRef} style={canvasStyle} />
+        <div style={{ fontSize: 17, color: "#94a3b8", fontWeight: 400, letterSpacing: "0.01em", marginBottom: 48 }}>
+          Measure speed. Score quality.
         </div>
 
+        <div style={{
+          display: "flex", gap: "14px", alignItems: "center",
+          opacity: phase >= 2 ? 1 : 0,
+          transform: phase >= 2 ? "translateY(0)" : "translateY(18px)",
+          transition: "opacity 0.75s ease, transform 0.75s cubic-bezier(0.4,0,0.2,1)",
+        }}>
+          <button
+            onClick={() => handleEnter("latency")}
+            style={{ padding: "13px 26px", border: "1.5px solid rgba(56,189,248,0.35)", background: "transparent", color: "#38bdf8", borderRadius: 9, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.01em" }}
+          >
+            Latency Dashboard →
+          </button>
+          <button
+            onClick={() => handleEnter("evaluations")}
+            style={{ padding: "13px 26px", border: "none", background: "linear-gradient(135deg,#38bdf8 0%,#6366f1 100%)", color: "#fff", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.01em" }}
+          >
+            Evaluations →
+          </button>
+        </div>
       </div>
+
     </div>
   );
 }
