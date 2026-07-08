@@ -44,17 +44,6 @@ function summarizeRun(samples: Sample[]) {
 export default function App() {
   const [landed, setLanded] = useState(false);
   const [tab, setTab] = useState<Tab>("latency");
-
-  if (!landed) {
-    return (
-      <LandingPage
-        onEnter={(t) => {
-          setTab(t as Tab);
-          setLanded(true);
-        }}
-      />
-    );
-  }
   const [config, setConfig] = useState<ProbeConfig | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -94,6 +83,17 @@ export default function App() {
     () => (selectedRun ? summarizeRun(selectedRun.samples) : null),
     [selectedRun],
   );
+
+  if (!landed) {
+    return (
+      <LandingPage
+        onEnter={(t) => {
+          setTab(t as Tab);
+          setLanded(true);
+        }}
+      />
+    );
+  }
 
   if (loading || !config) {
     return (

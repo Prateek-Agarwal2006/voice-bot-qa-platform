@@ -29,13 +29,17 @@ const POINTS = [
   { lat: -33.9,   lng:  151.2,   size: 0.4 },
 ];
 
-const SIZE = 620;
+const SIZE = 600;
+const POINT_COLOR  = () => "#38bdf8";
+const POINT_RADIUS = (d: { size?: number }) => d.size ?? 0.4;
+const ARC_COLOR    = () => "#38bdf8";
 
 export function LandingPage({ onEnter }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const globeRef = useRef<any>(null);
-  const [phase,   setPhase]   = useState<0 | 1 | 2>(0);
-  const [exiting, setExiting] = useState(false);
+  const [phase,      setPhase]      = useState<0 | 1 | 2>(0);
+  const [exiting,    setExiting]    = useState(false);
+  const [globeReady, setGlobeReady] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 2000);
@@ -43,12 +47,13 @@ export function LandingPage({ onEnter }: Props) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  useEffect(() => {
+  function onGlobeReady() {
     if (!globeRef.current) return;
     globeRef.current.controls().autoRotate      = true;
     globeRef.current.controls().autoRotateSpeed = 0.7;
     globeRef.current.pointOfView({ lat: 20, lng: -30, altitude: 2.0 }, 0);
-  }, []);
+    setGlobeReady(true);
+  }
 
   function handleEnter(tab: TabTarget) {
     setExiting(true);
@@ -67,26 +72,30 @@ export function LandingPage({ onEnter }: Props) {
         position: "absolute", top: "50%", left: "50%",
         width: `${SIZE}px`, height: `${SIZE}px`,
         marginTop: `-${SIZE / 2}px`, marginLeft: `-${SIZE / 2}px`,
-        transition: "transform 1.3s cubic-bezier(0.4,0,0.2,1)",
-        transform: phase >= 1 ? "translateX(27vw) scale(0.82)" : "translateX(0) scale(1)",
+        transition: "transform 1.3s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease",
+        transform: phase >= 1 ? "translateX(30vw) scale(0.82)" : "translateX(0) scale(1)",
+        opacity: globeReady ? 1 : 0,
         pointerEvents: "none",
-        overflow: "hidden",
+        willChange: "transform",
       }}>
         <Globe
           ref={globeRef}
           width={SIZE}
           height={SIZE}
+          animateIn={false}
+          onGlobeReady={onGlobeReady}
+          rendererConfig={{ antialias: false, alpha: true, preserveDrawingBuffer: true }}
           backgroundColor="rgba(0,0,0,0)"
-          globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
+          globeImageUrl="/earth-night.jpg"
           showAtmosphere={true}
           atmosphereColor="#38bdf8"
           atmosphereAltitude={0.18}
           pointsData={POINTS}
-          pointColor={() => "#38bdf8"}
-          pointRadius={(d: { size?: number }) => d.size ?? 0.4}
+          pointColor={POINT_COLOR}
+          pointRadius={POINT_RADIUS}
           pointAltitude={0.01}
           arcsData={ARCS}
-          arcColor={() => "#38bdf8"}
+          arcColor={ARC_COLOR}
           arcAltitude={0.5}
           arcDashLength={0.35}
           arcDashGap={0.65}
@@ -97,7 +106,7 @@ export function LandingPage({ onEnter }: Props) {
 
       {/* Text – flies in from left */}
       <div style={{
-        position: "absolute", left: "8%", top: "50%", width: "44%",
+        position: "absolute", left: "10%", top: "50%", width: "38%",
         transform: phase >= 1 ? "translateY(-50%) translateX(0)" : "translateY(-50%) translateX(-72px)",
         opacity: phase >= 1 ? 1 : 0,
         transition: "opacity 0.95s ease 0.1s, transform 0.95s cubic-bezier(0.4,0,0.2,1) 0.1s",
