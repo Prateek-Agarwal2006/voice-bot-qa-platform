@@ -105,7 +105,7 @@ async def run(
     past_structuring = False
 
     try:
-        await update_recording_status(recording_id, "downloading")
+        # Status already set to downloading by collector claim (atomic SKIP LOCKED).
         audio_bytes = await download(normalize(source_url, url_provider))
         print(f"[eval] downloaded {len(audio_bytes)} bytes, magic={audio_bytes[:8].hex()}", flush=True)
 

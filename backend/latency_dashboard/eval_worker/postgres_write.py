@@ -1,8 +1,17 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
+from latency_dashboard.pg_notify import RECORDING_UPDATED_CHANNEL, notify
 from latency_dashboard.postgres_client import get_pool
+
+
+def _as_timestamptz(value: datetime | str) -> datetime:
+    """asyncpg needs a datetime for TIMESTAMPTZ; eval result may store ISO strings."""
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value)
 
 
 async def update_recording_status(
@@ -34,6 +43,7 @@ async def update_recording_status(
                 status,
                 error_message if status == "failed" else None,
             )
+            await notify(conn, RECORDING_UPDATED_CHANNEL, recording_id)
 
 
 async def write_conversation(recording_id: str, conversation: dict) -> None:
@@ -71,5 +81,5 @@ async def write_evaluation(recording_id: str, result: dict, *, evaluation_id: st
             recording_id,
             result["judge_model"],
             json.dumps(result["dimensions"]),
-            result["evaluated_at"],
+            _as_timestamptz(result["evaluated_at"]),
         )
