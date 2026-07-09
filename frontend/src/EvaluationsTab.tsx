@@ -1,16 +1,10 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { EvaluationDetail } from "./EvaluationDetail";
-import { fetchRecordings, type Recording } from "./api";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { JobStageTimeline } from "./JobStageTimeline";
+import { fetchJob, fetchRecordings, type Recording } from "./api";
+import { STATUS_LABEL, timelineFromApiStages } from "./jobStages";
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Queued",
-  downloading: "Downloading",
-  transcribing: "Transcribing",
-  structuring: "Structuring",
-  evaluating: "Evaluating",
-  done: "Done",
-  failed: "Failed",
-};
+const TERMINAL = new Set(["done", "failed"]);
 
 function statusColor(status: string): string {
   if (status === "done") return "var(--success)";
@@ -41,15 +35,23 @@ function shortUrl(url: string | null) {
   }
 }
 
+function sourceLabel(rec: Recording): string {
+  if (rec.ingestion_source === "upload" && rec.source_filename) {
+    return `Upload: ${rec.source_filename}`;
+  }
+  return shortUrl(rec.source_url);
+}
+
 const STATUS_FILTERS = ["all", "done", "failed", "pending", "evaluating"];
 
 export function EvaluationsTab() {
+  const navigate = useNavigate();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -69,9 +71,57 @@ export function EvaluationsTab() {
 
   useEffect(() => { void load(); }, [load]);
 
-  function toggleRow(id: string) {
-    setSelectedId((prev) => (prev === id ? null : id));
-  }
+  const activeKey = recordings
+    .filter((rec) => !TERMINAL.has(rec.status))
+    .map((rec) => rec.recording_id)
+    .sort()
+    .join(",");
+
+  useEffect(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+
+    const activeIds = activeKey ? activeKey.split(",") : [];
+    if (activeIds.length === 0) return;
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const updates = await Promise.all(
+          activeIds.map(async (id) => {
+            try {
+              return await fetchJob(id);
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        setRecordings((prev) =>
+          prev.map((rec) => {
+            const latest = updates.find((u) => u?.recording_id === rec.recording_id);
+            if (!latest) return rec;
+            return {
+              ...rec,
+              status: latest.status,
+              error_message: latest.error_message,
+              stages: latest.stages ?? rec.stages,
+            };
+          }),
+        );
+      } catch {
+        // keep last known state
+      }
+    }, 3000);
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [activeKey]);
 
   if (loading) {
     return (
@@ -86,14 +136,14 @@ export function EvaluationsTab() {
     <div className="glass-card p-4">
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
-          <h2 className="h5 mb-1">Evaluations</h2>
-          <p className="text-secondary small mb-0">Browse submitted recordings and their evaluation status.</p>
+          <h2 className="h5 mb-1">Voice Bot Evaluation</h2>
+          <p className="text-secondary small mb-0">Browse submitted recordings and their evaluation stages.</p>
         </div>
         <div className="d-flex align-items-center gap-2">
           <select
             className="form-select form-select-sm"
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setSelectedId(null); }}
+            onChange={(e) => setStatusFilter(e.target.value)}
             style={{ minWidth: 130 }}
           >
             {STATUS_FILTERS.map((s) => (
@@ -108,6 +158,13 @@ export function EvaluationsTab() {
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-run text-white"
+            onClick={() => navigate("/evaluations/upload")}
+          >
+            Upload
+          </button>
         </div>
       </div>
 
@@ -117,65 +174,57 @@ export function EvaluationsTab() {
         <div className="empty-state">
           <div className="empty-icon">🎙</div>
           <h3 className="h5 mb-2">No recordings yet</h3>
-          <p className="text-secondary mb-0 mx-auto" style={{ maxWidth: 380 }}>
-            Submit a recording URL in the Ingest tab to start evaluation.
+          <p className="text-secondary mb-3 mx-auto" style={{ maxWidth: 380 }}>
+            Upload a recording URL or audio file to start evaluation.
           </p>
+          <button
+            type="button"
+            className="btn btn-run text-white"
+            onClick={() => navigate("/evaluations/upload")}
+          >
+            Upload recording
+          </button>
         </div>
       ) : (
-        <div className="table-responsive rounded-3 border" style={{ borderColor: "rgba(148,163,184,0.12)" }}>
-          <table className="table results-table align-middle mb-0">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Source</th>
-                <th>Submitted</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recordings.map((rec) => (
-                <Fragment key={rec.recording_id}>
-                  <tr
-                    onClick={() => toggleRow(rec.recording_id)}
-                    style={{ cursor: "pointer" }}
-                    className={selectedId === rec.recording_id ? "table-row-selected" : ""}
-                  >
-                    <td className="mono small">{shortId(rec.recording_id)}</td>
-                    <td><StatusBadge status={rec.status} /></td>
-                    <td className="small text-secondary">{shortUrl(rec.source_url)}</td>
-                    <td className="small text-secondary">{new Date(rec.created_at).toLocaleString()}</td>
-                  </tr>
-                  {selectedId === rec.recording_id && rec.status === "done" && (
-                    <tr>
-                      <td colSpan={4} className="p-0">
-                        <div className="eval-detail-wrapper">
-                          <EvaluationDetail recordingId={rec.recording_id} />
-                        </div>
-                      </td>
-                    </tr>
+        <div className="eval-list">
+          {recordings.map((rec) => {
+            const steps = timelineFromApiStages(rec.stages);
+
+            return (
+              <Fragment key={rec.recording_id}>
+                <div className="eval-card">
+                  <div className="eval-card-header-static">
+                    <div className="eval-card-meta">
+                      <span className="mono small">{shortId(rec.recording_id)}</span>
+                      <StatusBadge status={rec.status} />
+                      <span className="small text-secondary">{sourceLabel(rec)}</span>
+                    </div>
+                    <div className="eval-card-aside">
+                      <span className="small text-secondary">
+                        {new Date(rec.created_at).toLocaleString()}
+                      </span>
+                      <Link
+                        to={`/evaluations/${rec.recording_id}`}
+                        className="btn btn-sm btn-outline-secondary"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  </div>
+
+                  {steps.length > 0 && (
+                    <div className="eval-card-stages px-3 pb-3">
+                      <JobStageTimeline
+                        steps={steps}
+                        recordingId={rec.recording_id}
+                        judgeModel={rec.judge_model}
+                      />
+                    </div>
                   )}
-                  {selectedId === rec.recording_id && rec.status === "failed" && (
-                    <tr>
-                      <td colSpan={4}>
-                        <div className="small text-danger py-2">
-                          {rec.error_message ?? "Evaluation failed — no details available."}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  {selectedId === rec.recording_id && !["done", "failed"].includes(rec.status) && (
-                    <tr>
-                      <td colSpan={4}>
-                        <div className="small text-secondary py-2">
-                          Evaluation in progress — refresh to check for updates.
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+                </div>
+              </Fragment>
+            );
+          })}
         </div>
       )}
     </div>

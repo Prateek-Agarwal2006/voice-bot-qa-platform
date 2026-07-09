@@ -118,8 +118,11 @@ helm upgrade --install voicebot-qa deploy/helm/latency-dashboard \
 
 ### 4. Open the UI
 
+The React app is built into the UI (nginx) image. nginx serves static files and SPA
+paths (`/latency`, `/evaluations/:id`, …) and proxies `/api` to the FastAPI orchestrator.
+
 ```bash
-kubectl port-forward svc/voicebot-qa-ui 8080:80
+kubectl port-forward svc/voicebot-qa-ui 8080:8080
 open http://127.0.0.1:8080
 ```
 

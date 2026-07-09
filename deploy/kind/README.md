@@ -78,9 +78,11 @@ open http://127.0.0.1:30090
 Or port-forward:
 
 ```bash
-kubectl port-forward svc/voicebot-qa-ui 8080:80
+kubectl port-forward svc/voicebot-qa-ui 8080:8080
 open http://127.0.0.1:8080
 ```
+
+nginx serves the React SPA (`/`, `/latency`, `/evaluations`, `/evaluations/:id`) and proxies `/api` to the orchestrator.
 
 ## Teardown
 
@@ -104,7 +106,7 @@ colima stop
 
 - **Browser "connection failed" on `:30090`** — port not published. Port-forward instead:
   ```bash
-  kubectl port-forward svc/voicebot-qa-ui 8080:80
+  kubectl port-forward svc/voicebot-qa-ui 8080:8080
   ```
 - **ImagePullBackOff** — run `build-and-load.sh` again; kind needs images loaded locally.
 - **Postgres pod not ready** — check logs: `kubectl logs deploy/voicebot-qa-postgres`. Schema errors mean `files/schema.sql` wasn't copied before `helm install` — re-run `build-and-load.sh`.

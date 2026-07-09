@@ -11,18 +11,29 @@ async def update_recording_status(
     *,
     error_message: str | None = None,
 ) -> None:
+    """Update current status and append a durable stage-history event."""
     pool = await get_pool()
     async with pool.acquire() as conn:
-        await conn.execute(
-            """
-            UPDATE recordings
-            SET status = $1, error_message = $2, updated_at = NOW()
-            WHERE recording_id = $3
-            """,
-            status,
-            error_message,
-            recording_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                """
+                UPDATE recordings
+                SET status = $1, error_message = $2, updated_at = NOW()
+                WHERE recording_id = $3
+                """,
+                status,
+                error_message,
+                recording_id,
+            )
+            await conn.execute(
+                """
+                INSERT INTO recording_stage_events (recording_id, stage, detail)
+                VALUES ($1, $2, $3)
+                """,
+                recording_id,
+                status,
+                error_message if status == "failed" else None,
+            )
 
 
 async def write_conversation(recording_id: str, conversation: dict) -> None:

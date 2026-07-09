@@ -18,6 +18,7 @@ from latency_dashboard.eval_worker.postgres_write import (
 )
 from latency_dashboard.eval_worker.scribe import transcribe_bytes
 from latency_dashboard.eval_worker.serialize import words_from_scribe_payload
+from latency_dashboard.eval_worker.staged_audio import delete_staged_audio
 
 STORED_SCORE_MAX = 1.0
 JUDGE_SCORE_MAX = 10
@@ -92,8 +93,16 @@ def _build_dimension_result(*, dimension_key: str, metric_kind: str, metric: Any
     return result
 
 
-async def run(recording_id: str, source_url: str, judge_model: str, url_provider: str = "direct") -> None:
+async def run(
+    recording_id: str,
+    source_url: str,
+    judge_model: str,
+    url_provider: str = "direct",
+    ingestion_source: str = "https",
+) -> None:
     """Full eval pipeline for one recording: download → transcribe → structure → judge → write."""
+    conversation_written = False
+    past_structuring = False
 
     try:
         await update_recording_status(recording_id, "downloading")
@@ -111,7 +120,12 @@ async def run(recording_id: str, source_url: str, judge_model: str, url_provider
             raw_scribe=raw_scribe,
             words=words,
         )
+        past_structuring = True
         await write_conversation(recording_id, conversation)
+        conversation_written = True
+
+        if ingestion_source == "upload":
+            await delete_staged_audio(recording_id)
 
         await update_recording_status(recording_id, "evaluating")
         judge = build_judge_model(model=judge_model)
@@ -138,5 +152,7 @@ async def run(recording_id: str, source_url: str, judge_model: str, url_provider
         await update_recording_status(recording_id, "done")
 
     except Exception as exc:
+        if ingestion_source == "upload" and (conversation_written or past_structuring):
+            await delete_staged_audio(recording_id)
         await update_recording_status(recording_id, "failed", error_message=str(exc))
         raise

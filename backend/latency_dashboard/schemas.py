@@ -46,17 +46,28 @@ class RunDTO(BaseModel):
     samples: List[Sample]
 
 
+class StageEventDTO(BaseModel):
+    """One pipeline stage for the UI timeline — recording_stage_events → API."""
+    stage: str
+    state: str  # completed | active | failed
+    label: str
+    detail: Optional[str] = None
+    at: str
+
+
 class RecordingDTO(BaseModel):
     """Job status + metadata — recordings table → API."""
     recording_id: str
     status: str
     ingestion_source: str
     source_url: Optional[str] = None
+    source_filename: Optional[str] = None
     judge_model: str = "gpt-4o-mini"
     url_provider: str = "direct"
     error_message: Optional[str] = None
     created_at: str
     updated_at: str
+    stages: List[StageEventDTO] = []
 
 
 class ConversationDTO(BaseModel):

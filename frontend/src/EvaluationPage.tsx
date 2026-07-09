@@ -1,11 +1,16 @@
+import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   fetchConversation,
+  fetchJob,
   fetchScores,
   type Conversation,
   type DimensionScore,
   type Evaluation,
+  type JobStatus,
 } from "./api";
+import { JobStageTimeline } from "./JobStageTimeline";
+import { timelineFromApiStages } from "./jobStages";
 
 const DIMENSION_ORDER = [
   "task_success",
@@ -24,7 +29,6 @@ function scoreColor(score: number): string {
 }
 
 function ScoreCard({ dimKey, dim }: { dimKey: string; dim: DimensionScore }) {
-  const [expanded, setExpanded] = useState(false);
   const display = dim.judge_score ?? dim.score * (dim.judge_score_max ?? 10);
   const max = dim.judge_score_max ?? 10;
   const pct = Math.min(100, (display / max) * 100);
@@ -50,23 +54,14 @@ function ScoreCard({ dimKey, dim }: { dimKey: string; dim: DimensionScore }) {
         </span>
       </div>
 
-      <div className="score-bar-track mb-2">
+      <div className="score-bar-track mb-3">
         <div className="score-bar-fill" style={{ width: `${pct}%`, background: color }} />
       </div>
 
-      <button
-        type="button"
-        className="btn btn-link p-0 small text-secondary"
-        style={{ fontSize: "0.75rem", textDecoration: "none" }}
-        onClick={() => setExpanded((v) => !v)}
-      >
-        {expanded ? "Hide rationale ▲" : "Show rationale ▼"}
-      </button>
-      {expanded && (
-        <p className="small text-secondary mt-2 mb-0" style={{ lineHeight: 1.55 }}>
-          {dim.rationale || "No rationale provided."}
-        </p>
-      )}
+      <p className="section-label mb-1">Reasoning</p>
+      <p className="small text-secondary mb-0" style={{ lineHeight: 1.55 }}>
+        {dim.rationale || "No rationale provided."}
+      </p>
     </div>
   );
 }
@@ -100,41 +95,79 @@ function TranscriptPanel({ conversation }: { conversation: Conversation }) {
   );
 }
 
-interface Props {
-  recordingId: string;
-}
-
-export function EvaluationDetail({ recordingId }: Props) {
+export function EvaluationPage() {
+  const { recordingId = "" } = useParams();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [job, setJob] = useState<JobStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!recordingId) return;
     setLoading(true);
     setError(null);
-    Promise.all([fetchConversation(recordingId), fetchScores(recordingId)])
-      .then(([conv, ev]) => { setConversation(conv); setEvaluation(ev); })
+    Promise.all([
+      fetchConversation(recordingId).catch(() => null),
+      fetchScores(recordingId).catch(() => null),
+      fetchJob(recordingId).catch(() => null),
+    ])
+      .then(([conv, ev, jobStatus]) => {
+        setConversation(conv);
+        setEvaluation(ev);
+        setJob(jobStatus);
+        if (!conv && !ev && !jobStatus) {
+          setError("Evaluation not found");
+        }
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load detail"))
       .finally(() => setLoading(false));
   }, [recordingId]);
 
   if (loading) {
     return (
-      <div className="text-center py-4">
-        <div className="spinner-ring mx-auto" />
+      <div className="glass-card p-4 text-center">
+        <div className="spinner-ring mx-auto mb-3" />
+        <p className="text-secondary mb-0">Loading evaluation…</p>
       </div>
     );
   }
 
   if (error) {
-    return <div className="alert alert-danger border-0 py-2">{error}</div>;
+    return (
+      <div className="glass-card p-4">
+        <div className="alert alert-danger border-0 py-2 mb-3">{error}</div>
+        <Link to="/evaluations" className="btn btn-sm btn-outline-secondary">
+          Back to Voice Bot Evaluation
+        </Link>
+      </div>
+    );
   }
 
   const orderedDims = DIMENSION_ORDER.filter((k) => evaluation?.dimensions[k]);
+  const stages = timelineFromApiStages(job?.stages);
 
   return (
-    <div className="eval-detail">
+    <div className="glass-card p-4">
+      <div className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <p className="section-label mb-2">Evaluation detail</p>
+          <h1 className="h4 mb-1">Recording scores & reasoning</h1>
+          <p className="mono small text-secondary mb-0">{recordingId}</p>
+        </div>
+        <Link to="/evaluations" className="btn btn-sm btn-outline-secondary">
+          Back to Voice Bot Evaluation
+        </Link>
+      </div>
+
+      <div className="mb-4">
+        <JobStageTimeline
+          steps={stages}
+          recordingId={recordingId}
+          judgeModel={evaluation?.judge_model ?? undefined}
+        />
+      </div>
+
       {evaluation && (
         <div className="mb-4">
           <p className="section-label mb-2">Judge scores</p>
@@ -150,7 +183,31 @@ export function EvaluationDetail({ recordingId }: Props) {
         </div>
       )}
 
-      {conversation && <TranscriptPanel conversation={conversation} />}
+      {!evaluation && job?.status === "failed" && (
+        <div className="alert alert-danger border-0 py-2 mb-4">
+          {job.error_message ?? "Evaluation failed — no scores available."}
+          {conversation && (
+            <div className="small mt-2 mb-0" style={{ color: "#fecaca" }}>
+              Transcript was saved before the failure — scroll down to review it.
+            </div>
+          )}
+        </div>
+      )}
+
+      {conversation && (
+        <div className="mb-2">
+          {!evaluation && job?.status === "failed" && (
+            <p className="section-label mb-2">Transcript (available despite judge failure)</p>
+          )}
+          <TranscriptPanel conversation={conversation} />
+        </div>
+      )}
+
+      {!conversation && job?.status === "failed" && (
+        <p className="small text-secondary mb-0">
+          No transcript was saved — the job failed before structuring completed.
+        </p>
+      )}
     </div>
   );
 }

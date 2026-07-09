@@ -24,6 +24,8 @@ spec:
           env:
             - name: EVAL_POLL_INTERVAL_S
               value: {{ .Values.evalWorker.pollIntervalSeconds | quote }}
+            - name: ORCHESTRATOR_BASE_URL
+              value: {{ printf "http://%s-orchestrator:%v" (include "voicebot-qa.fullname" .) .Values.orchestrator.port | quote }}
             {{- include "voicebot-qa.postgresEnv" . | nindent 12 }}
             {{- include "voicebot-qa.apiKeysEnv" . | nindent 12 }}
           {{- if .Values.vertex.enabled }}

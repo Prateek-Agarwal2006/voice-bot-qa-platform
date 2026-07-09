@@ -52,10 +52,23 @@ CREATE TABLE IF NOT EXISTS recordings (
 -- Idempotent migration for clusters created before judge_model was added.
 ALTER TABLE recordings ADD COLUMN IF NOT EXISTS judge_model TEXT NOT NULL DEFAULT 'gpt-4o-mini';
 ALTER TABLE recordings ADD COLUMN IF NOT EXISTS url_provider TEXT NOT NULL DEFAULT 'direct';
+ALTER TABLE recordings ADD COLUMN IF NOT EXISTS source_filename TEXT;
 
 -- Partial index: only pending rows are polled; keeps the scan tiny.
 CREATE INDEX IF NOT EXISTS idx_recordings_pending
     ON recordings (created_at ASC) WHERE status = 'pending';
+
+-- Append-only stage history so the UI can show a durable pipeline timeline after reload.
+CREATE TABLE IF NOT EXISTS recording_stage_events (
+    id            BIGSERIAL PRIMARY KEY,
+    recording_id  TEXT         NOT NULL REFERENCES recordings(recording_id) ON DELETE CASCADE,
+    stage         TEXT         NOT NULL,
+    detail        TEXT,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_recording_stage_events_recording
+    ON recording_stage_events (recording_id, created_at ASC);
 
 -- ── conversations ──────────────────────────────────────────────────────────────
 -- Structured output of transcription + structuring stages.

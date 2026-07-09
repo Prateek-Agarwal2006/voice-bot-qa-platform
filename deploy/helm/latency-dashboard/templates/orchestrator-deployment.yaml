@@ -27,11 +27,17 @@ spec:
           env:
             - name: CONFIG_PATH
               value: /config/config.json
+            - name: UPLOAD_DIR
+              value: /data/uploads
+            - name: ORCHESTRATOR_BASE_URL
+              value: {{ printf "http://%s-orchestrator:%v" (include "voicebot-qa.fullname" .) .Values.orchestrator.port | quote }}
             {{- include "voicebot-qa.postgresEnv" . | nindent 12 }}
           volumeMounts:
             - name: probe-config
               mountPath: /config
               readOnly: true
+            - name: upload-staging
+              mountPath: /data/uploads
           readinessProbe:
             httpGet:
               path: /api/health
@@ -50,3 +56,5 @@ spec:
         - name: probe-config
           configMap:
             name: {{ include "voicebot-qa.fullname" . }}-orchestrator-config
+        - name: upload-staging
+          emptyDir: {}

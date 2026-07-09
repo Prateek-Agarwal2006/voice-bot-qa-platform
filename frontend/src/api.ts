@@ -75,15 +75,25 @@ export function fetchRuns(): Promise<Run[]> {
 
 // ── Eval / Jobs ─────────────────────────────────────────────────────────────
 
+export interface StageEvent {
+  stage: string;
+  state: string;
+  label: string;
+  detail?: string | null;
+  at: string;
+}
+
 export interface Recording {
   recording_id: string;
   status: string;
   ingestion_source: string;
   source_url: string | null;
+  source_filename: string | null;
   judge_model: string;
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  stages?: StageEvent[];
 }
 
 export const URL_PROVIDERS: { label: string; value: string }[] = [
@@ -184,6 +194,7 @@ export interface JobStatus {
   recording_id: string;
   status: string;
   error_message: string | null;
+  stages?: StageEvent[];
 }
 
 export function fetchRecordings(status?: string): Promise<Recording[]> {
@@ -205,6 +216,21 @@ export function submitJob(sourceUrl: string, judgeModel: string, urlProvider: st
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source_url: sourceUrl, judge_model: judgeModel, url_provider: urlProvider }),
   });
+}
+
+export async function submitJobUpload(file: File, judgeModel: string): Promise<JobStatus> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("judge_model", judgeModel);
+  const response = await fetch("/api/jobs/upload", {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+  return response.json() as Promise<JobStatus>;
 }
 
 export function fetchJob(recordingId: string): Promise<JobStatus> {

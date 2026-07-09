@@ -3,6 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from latency_dashboard.orchestrator.stage_read import (
+    fetch_stages_for_many,
+    timeline_from_events,
+)
 from latency_dashboard.postgres_client import get_pool
 from latency_dashboard.schemas import ConversationDTO, EvaluationDTO, RecordingDTO
 
@@ -22,7 +26,7 @@ async def list_recordings(
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     sql = f"""
-    SELECT recording_id, status, ingestion_source, source_url, judge_model,
+    SELECT recording_id, status, ingestion_source, source_url, source_filename, judge_model,
            url_provider, error_message, created_at, updated_at
     FROM recordings
     {where}
@@ -32,6 +36,10 @@ async def list_recordings(
 
     async with pool.acquire() as conn:
         rows = await conn.fetch(sql, *params)
+        events_by_id = await fetch_stages_for_many(
+            conn,
+            [row["recording_id"] for row in rows],
+        )
 
     return [
         RecordingDTO(
@@ -39,11 +47,17 @@ async def list_recordings(
             status=row["status"],
             ingestion_source=row["ingestion_source"],
             source_url=row["source_url"],
+            source_filename=row["source_filename"],
             judge_model=row["judge_model"],
             url_provider=row["url_provider"],
             error_message=row["error_message"],
             created_at=row["created_at"].isoformat(),
             updated_at=row["updated_at"].isoformat(),
+            stages=timeline_from_events(
+                events_by_id.get(row["recording_id"], []),
+                current_status=row["status"],
+                error_message=row["error_message"],
+            ),
         )
         for row in rows
     ]
