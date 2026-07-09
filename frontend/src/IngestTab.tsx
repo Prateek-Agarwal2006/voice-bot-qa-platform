@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchJob, submitJob, JUDGE_MODEL_PRESETS, URL_PROVIDERS, type JobStatus } from "./api";
+import { JudgeModelSelect, type JudgeModelOption } from "./JudgeModelSelect";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
-const ALL_MODELS = Object.entries(JUDGE_MODEL_PRESETS).flatMap(([provider, models]) =>
-  models.map((m) => ({ label: `${provider} — ${m}`, value: m }))
+const ALL_MODELS: JudgeModelOption[] = Object.entries(JUDGE_MODEL_PRESETS).flatMap(
+  ([provider, models]) =>
+    models.map((m) => ({
+      provider,
+      value: m,
+      label: `${provider} — ${m}`,
+    })),
 );
 
 const STATUS_LABEL: Record<string, string> = {
@@ -118,16 +124,12 @@ export function IngestTab() {
           <label className="form-label small fw-semibold text-secondary mb-1">
             Judge Model
           </label>
-          <select
-            className="form-select"
+          <JudgeModelSelect
+            options={ALL_MODELS}
             value={judgeModel}
-            onChange={(e) => setJudgeModel(e.target.value)}
+            onChange={setJudgeModel}
             disabled={submitting}
-          >
-            {ALL_MODELS.map(({ label, value }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          />
         </div>
         <div className="col-12 col-lg-1 d-flex align-items-end">
           <button

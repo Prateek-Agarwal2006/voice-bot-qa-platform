@@ -26,10 +26,20 @@ VERTEX_REQUIRED_ENV = (
 )
 
 JUDGE_MODEL_PRESETS: dict[str, tuple[str, ...]] = {
-    "OpenAI": ("gpt-4o-mini", "gpt-4o"),
-    "Anthropic": ("anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-8"),
-    "Google": ("gemini/gemini-2.0-flash", "gemini/gemini-2.5-pro"),
-    "Vertex": (
+    "OpenAI": ("gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"),
+    "Anthropic": (
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-opus-4-8",
+        "anthropic/claude-haiku-4-5-20251001",
+    ),
+    "Google": (
+        "gemini/gemini-2.0-flash",
+        "gemini/gemini-2.0-flash-lite",
+        "gemini/gemini-2.5-flash",
+        "gemini/gemini-2.5-flash-lite",
+        "gemini/gemini-2.5-pro",
+    ),
+    "Vertex Gemini": (
         "vertex_ai/gemini-2.0-flash",
         "vertex_ai/gemini-2.0-flash-lite",
         "vertex_ai/gemini-2.5-flash",
@@ -40,6 +50,30 @@ JUDGE_MODEL_PRESETS: dict[str, tuple[str, ...]] = {
         "vertex_ai/gemini-3.1-flash-lite",
         "vertex_ai/gemini-3.1-pro-preview",
         "vertex_ai/gemini-3.5-flash",
+    ),
+    # Google Cloud / Anthropic Agent Platform IDs (Claude on Vertex).
+    # https://platform.claude.com/docs/en/build-with-claude/claude-on-vertex-ai
+    # Plus older Model Garden IDs still documented by Google Cloud / LiteLLM.
+    "Vertex Claude": (
+        "vertex_ai/claude-fable-5",
+        "vertex_ai/claude-sonnet-5",
+        "vertex_ai/claude-opus-4-8",
+        "vertex_ai/claude-opus-4-7",
+        "vertex_ai/claude-opus-4-6",
+        "vertex_ai/claude-sonnet-4-6",
+        "vertex_ai/claude-sonnet-4-5@20250929",
+        "vertex_ai/claude-opus-4-5@20251101",
+        "vertex_ai/claude-haiku-4-5@20251001",
+        "vertex_ai/claude-sonnet-4@20250514",
+        "vertex_ai/claude-opus-4-1@20250805",
+        "vertex_ai/claude-opus-4@20250514",
+        "vertex_ai/claude-3-5-haiku@20241022",
+        "vertex_ai/claude-3-7-sonnet@20250219",
+        "vertex_ai/claude-3-5-sonnet-v2@20241022",
+        "vertex_ai/claude-3-5-sonnet@20240620",
+        "vertex_ai/claude-3-opus@20240229",
+        "vertex_ai/claude-3-sonnet@20240229",
+        "vertex_ai/claude-3-haiku@20240307",
     ),
 }
 
