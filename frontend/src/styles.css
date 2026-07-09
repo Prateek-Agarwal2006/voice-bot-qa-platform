@@ -161,6 +161,88 @@ body {
   background: rgba(2, 6, 23, 0.75);
 }
 
+.judge-model-select {
+  position: relative;
+}
+
+.judge-model-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.judge-model-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.judge-model-trigger-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.judge-model-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.96);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.judge-model-search {
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0;
+  background: transparent;
+}
+
+.judge-model-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.judge-model-option {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: flex-start;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+}
+
+.judge-model-option:hover,
+.judge-model-option.is-active {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.judge-model-option-provider {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.judge-model-option-id {
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
 .target-grid {
   max-height: 260px;
   overflow-y: auto;
