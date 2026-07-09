@@ -28,7 +28,11 @@ evalWorker:
 
 secrets:
   name: voicebot-qa-secrets
-  # postgresDsn set via create-secrets.sh — do not hardcode here
+  # postgresDsn + API keys + optional Vertex fields via create-secrets.sh
+
+# Set true after create-secrets.sh has VERTEXAI_* + VERTEX_SA_JSON_FILE
+vertex:
+  enabled: false
 
 service:
   ui:

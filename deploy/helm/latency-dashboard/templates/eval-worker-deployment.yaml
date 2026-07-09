@@ -26,5 +26,20 @@ spec:
               value: {{ .Values.evalWorker.pollIntervalSeconds | quote }}
             {{- include "voicebot-qa.postgresEnv" . | nindent 12 }}
             {{- include "voicebot-qa.apiKeysEnv" . | nindent 12 }}
+          {{- if .Values.vertex.enabled }}
+          volumeMounts:
+            - name: gcp-sa
+              mountPath: {{ .Values.vertex.credentialsMountDir | quote }}
+              readOnly: true
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.vertex.enabled }}
+      volumes:
+        - name: gcp-sa
+          secret:
+            secretName: {{ .Values.secrets.name }}
+            items:
+              - key: {{ .Values.vertex.credentialsSecretKey }}
+                path: {{ .Values.vertex.credentialsFileName }}
+      {{- end }}

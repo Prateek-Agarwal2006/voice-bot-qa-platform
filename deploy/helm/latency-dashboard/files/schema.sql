@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS recordings (
     ingestion_source ingestion_source  NOT NULL,
     source_url       TEXT,
     judge_model      TEXT              NOT NULL DEFAULT 'gpt-4o-mini',
+    url_provider     TEXT              NOT NULL DEFAULT 'direct',
     error_message    TEXT,
     created_at       TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ       NOT NULL DEFAULT NOW()
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS recordings (
 
 -- Idempotent migration for clusters created before judge_model was added.
 ALTER TABLE recordings ADD COLUMN IF NOT EXISTS judge_model TEXT NOT NULL DEFAULT 'gpt-4o-mini';
+ALTER TABLE recordings ADD COLUMN IF NOT EXISTS url_provider TEXT NOT NULL DEFAULT 'direct';
 
 -- Partial index: only pending rows are polled; keeps the scan tiny.
 CREATE INDEX IF NOT EXISTS idx_recordings_pending

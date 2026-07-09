@@ -44,7 +44,7 @@ Orchestrator    → read Postgres → serve React dashboard
 | VBE3 | Speaker separation | Stereo channels (L=Customer, R=Voice Bot); no diarization | ✅ Locked |
 | VBE4 | Evaluation method | LLM-as-judge with rubrics (one Judge call per dimension) | ✅ Locked |
 | VBE5 | Judge framework | DeepEval GEval + VoiceGEval subclass; voice-bot-first | ✅ Locked |
-| VBE6 | Judge LLM provider | OpenAI / Anthropic / Google via LiteLLM | ✅ Locked |
+| VBE6 | Judge LLM provider | OpenAI / Anthropic / Google / Vertex AI via LiteLLM | ✅ Locked |
 
 ### Merged platform
 
@@ -316,7 +316,7 @@ DeepEval normalises to **0–1** (`score`). Rubrics ask the Judge for **0–10**
 
 ### Choice
 
-Standard chat/completions API via **LiteLLM**: OpenAI, Anthropic, or Google. Provider detected from model ID at runtime. API key resolved from env (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`).
+Standard chat/completions API via **LiteLLM**: OpenAI, Anthropic, Google AI Studio, or **Vertex AI** (`vertex_ai/...`). Provider detected from model ID at runtime. API keys from env (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`). Vertex uses `VERTEXAI_PROJECT`, `VERTEXAI_LOCATION`, and `GOOGLE_APPLICATION_CREDENTIALS` (mounted SA JSON) — no API key.
 
 ### Why not Cursor SDK
 
@@ -324,7 +324,7 @@ Cursor SDK is an agent runtime, not a drop-in LLM judge endpoint. DeepEval expec
 
 ### Why LiteLLM
 
-Single abstraction over three providers. Swapping judge models (e.g. GPT-4o → Claude Sonnet) is one env var change — no code change.
+Single abstraction over providers. Swapping judge models (e.g. GPT-4o → Claude Sonnet → Vertex Gemini) is a model-id / env change — no metric code change.
 
 ---
 

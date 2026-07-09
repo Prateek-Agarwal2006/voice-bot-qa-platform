@@ -62,4 +62,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ .Values.secrets.name }}
       key: GEMINI_API_KEY
       optional: true
+- name: VERTEXAI_PROJECT
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.name }}
+      key: VERTEXAI_PROJECT
+      optional: true
+- name: VERTEXAI_LOCATION
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.name }}
+      key: VERTEXAI_LOCATION
+      optional: true
+{{- if .Values.vertex.enabled }}
+- name: GOOGLE_APPLICATION_CREDENTIALS
+  value: {{ .Values.vertex.credentialsMountPath | quote }}
+{{- end }}
 {{- end -}}
