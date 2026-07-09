@@ -32,13 +32,25 @@ export POSTGRES_DSN="postgresql://voicebot:voicebot@postgres-svc:5432/voicebot"
 export ELEVENLABS_API_KEY="..."
 export OPENAI_API_KEY="..."
 export ANTHROPIC_API_KEY="..."   # optional
-export GEMINI_API_KEY="..."      # optional
+export GEMINI_API_KEY="..."      # optional — Google AI Studio
+# Optional Vertex AI judge:
+# export VERTEXAI_PROJECT="your-gcp-project"
+# export VERTEXAI_LOCATION="us-central1"
+# export VERTEX_SA_JSON_FILE="/path/to/gcp-sa.json"
 
 chmod +x deploy/kind/create-secrets.sh
 ./deploy/kind/create-secrets.sh
 ```
 
 API keys live only in the K8s Secret — never committed to git.
+
+For Vertex, enable the SA file mount on the eval worker:
+
+```bash
+helm upgrade --install voicebot-qa deploy/helm/latency-dashboard \
+  -f deploy/helm/latency-dashboard/values-kind.yaml \
+  --set vertex.enabled=true
+```
 
 ## 3. Helm install
 
@@ -96,4 +108,4 @@ colima stop
   ```
 - **ImagePullBackOff** — run `build-and-load.sh` again; kind needs images loaded locally.
 - **Postgres pod not ready** — check logs: `kubectl logs deploy/voicebot-qa-postgres`. Schema errors mean `files/schema.sql` wasn't copied before `helm install` — re-run `build-and-load.sh`.
-- **Eval worker CrashLoop** — check `ELEVENLABS_API_KEY` and the judge API key (e.g. `OPENAI_API_KEY`) in the Secret. Judge model is now per-job, not a pod env var.
+- **Eval worker CrashLoop** — check `ELEVENLABS_API_KEY` and the judge credentials in the Secret (e.g. `OPENAI_API_KEY`, or for Vertex: `VERTEXAI_PROJECT` / `VERTEXAI_LOCATION` / `GCP_SA_JSON` with `vertex.enabled=true`). Judge model is per-job, not a pod env var.

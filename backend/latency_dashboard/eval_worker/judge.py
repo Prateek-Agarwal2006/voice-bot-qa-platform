@@ -1,4 +1,4 @@
-"""Judge LLM config — OpenAI, Anthropic, or Google only."""
+"""Judge LLM config — OpenAI, Anthropic, Google (API key), or Vertex AI via LiteLLM."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import litellm
 from deepeval.models import LiteLLMModel
 from litellm import get_llm_provider
 
-SUPPORTED_PROVIDERS = frozenset({"openai", "anthropic", "gemini", "google"})
+SUPPORTED_PROVIDERS = frozenset({"openai", "anthropic", "gemini", "google", "vertex_ai"})
 
 PROVIDER_KEY_ENV: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
@@ -18,10 +18,29 @@ PROVIDER_KEY_ENV: dict[str, str] = {
     "google": "GEMINI_API_KEY",
 }
 
+# Vertex uses GCP ADC (GOOGLE_APPLICATION_CREDENTIALS) + project/location — no API key.
+VERTEX_REQUIRED_ENV = (
+    "VERTEXAI_PROJECT",
+    "VERTEXAI_LOCATION",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+)
+
 JUDGE_MODEL_PRESETS: dict[str, tuple[str, ...]] = {
     "OpenAI": ("gpt-4o-mini", "gpt-4o"),
     "Anthropic": ("anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-8"),
     "Google": ("gemini/gemini-2.0-flash", "gemini/gemini-2.5-pro"),
+    "Vertex": (
+        "vertex_ai/gemini-2.0-flash",
+        "vertex_ai/gemini-2.0-flash-lite",
+        "vertex_ai/gemini-2.5-flash",
+        "vertex_ai/gemini-2.5-flash-lite",
+        "vertex_ai/gemini-2.5-pro",
+        "vertex_ai/gemini-3-flash-preview",
+        "vertex_ai/gemini-3-pro-preview",
+        "vertex_ai/gemini-3.1-flash-lite",
+        "vertex_ai/gemini-3.1-pro-preview",
+        "vertex_ai/gemini-3.5-flash",
+    ),
 }
 
 
@@ -29,7 +48,7 @@ JUDGE_MODEL_PRESETS: dict[str, tuple[str, ...]] = {
 class JudgeConfig:
     model: str
     provider: str
-    api_key: str
+    api_key: str | None = None
 
 
 class VoiceBotJudgeModel(LiteLLMModel):
@@ -52,8 +71,17 @@ def resolve_judge_config(model: str) -> JudgeConfig:
 
     if provider not in SUPPORTED_PROVIDERS:
         raise RuntimeError(
-            f"Judge provider {provider!r} is not supported. Use OpenAI, Anthropic, or Google."
+            f"Judge provider {provider!r} is not supported. "
+            "Use OpenAI, Anthropic, Google, or Vertex AI (vertex_ai/...)."
         )
+
+    if provider == "vertex_ai":
+        missing = [name for name in VERTEX_REQUIRED_ENV if not (os.getenv(name) or "").strip()]
+        if missing:
+            raise RuntimeError(
+                f"{', '.join(missing)} required for Vertex judge model {model_id!r}."
+            )
+        return JudgeConfig(model=model_id, provider=provider, api_key=None)
 
     key_env = PROVIDER_KEY_ENV[provider]
     api_key = (os.getenv(key_env) or "").strip()
@@ -63,9 +91,12 @@ def resolve_judge_config(model: str) -> JudgeConfig:
     return JudgeConfig(model=model_id, provider=provider, api_key=api_key)
 
 
-def build_judge_model(*, model: str) -> VoiceBotJudgeModel:   #this return VoiceBotJudgeModel object which is a subclass of LiteLLMModel which is a wrapper around the LLM model
+def build_judge_model(*, model: str) -> VoiceBotJudgeModel:
     cfg = resolve_judge_config(model)
-    return VoiceBotJudgeModel(model=cfg.model, api_key=cfg.api_key)  #if want to use Azure API key , pass base_url too along with model and api_key.....also update SUPPORTED_PROVIDERS to include azure , PROVIDER_KEY_ENV to include azure_api_key etc.
+    if cfg.provider == "vertex_ai":
+        # LiteLLM reads VERTEXAI_PROJECT / VERTEXAI_LOCATION / GOOGLE_APPLICATION_CREDENTIALS.
+        return VoiceBotJudgeModel(model=cfg.model)
+    return VoiceBotJudgeModel(model=cfg.model, api_key=cfg.api_key)
 
 
 def judge_model_label(judge: VoiceBotJudgeModel) -> str:

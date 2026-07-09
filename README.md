@@ -21,7 +21,7 @@ End-to-end quality assurance platform for voice bot conversations. Combines two 
 
 **Transcription:** ElevenLabs Scribe v2 (multichannel, speaker-separated).
 
-**Judging:** DeepEval GEval with a selectable LLM judge per job (OpenAI / Anthropic / Google).
+**Judging:** DeepEval GEval with a selectable LLM judge per job (OpenAI / Anthropic / Google AI Studio / Vertex AI via LiteLLM).
 
 ### Evaluation dimensions
 
@@ -87,7 +87,11 @@ export POSTGRES_DSN="postgresql://voicebot:voicebot@postgres-svc:5432/voicebot"
 export ELEVENLABS_API_KEY="your-key"
 export OPENAI_API_KEY="your-key"
 export ANTHROPIC_API_KEY="your-key"   # optional
-export GEMINI_API_KEY="your-key"      # optional
+export GEMINI_API_KEY="your-key"      # optional — Google AI Studio
+# Optional — Vertex AI judge (also set vertex.enabled=true in Helm values):
+# export VERTEXAI_PROJECT="your-gcp-project"
+# export VERTEXAI_LOCATION="us-central1"
+# export VERTEX_SA_JSON_FILE="/path/to/gcp-sa.json"
 
 chmod +x deploy/kind/create-secrets.sh
 ./deploy/kind/create-secrets.sh
@@ -95,12 +99,22 @@ chmod +x deploy/kind/create-secrets.sh
 
 API keys live only in the K8s Secret — never committed to git.
 
+For Vertex judges, after secrets are applied enable the SA mount:
+
+```bash
+helm upgrade --install voicebot-qa deploy/helm/latency-dashboard \
+  -f deploy/helm/latency-dashboard/values-kind.yaml \
+  --set vertex.enabled=true
+```
+
 ### 3. Install with Helm
 
 ```bash
 helm upgrade --install voicebot-qa deploy/helm/latency-dashboard \
   -f deploy/helm/latency-dashboard/values-kind.yaml
 ```
+
+> If you already enabled Vertex in step 2 with `--set vertex.enabled=true`, you can skip a second install.
 
 ### 4. Open the UI
 

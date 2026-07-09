@@ -95,6 +95,18 @@ export const JUDGE_MODEL_PRESETS: Record<string, string[]> = {
   OpenAI: ["gpt-4o-mini", "gpt-4o"],
   Anthropic: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-8"],
   Google: ["gemini/gemini-2.0-flash", "gemini/gemini-2.5-pro"],
+  Vertex: [
+    "vertex_ai/gemini-2.0-flash",
+    "vertex_ai/gemini-2.0-flash-lite",
+    "vertex_ai/gemini-2.5-flash",
+    "vertex_ai/gemini-2.5-flash-lite",
+    "vertex_ai/gemini-2.5-pro",
+    "vertex_ai/gemini-3-flash-preview",
+    "vertex_ai/gemini-3-pro-preview",
+    "vertex_ai/gemini-3.1-flash-lite",
+    "vertex_ai/gemini-3.1-pro-preview",
+    "vertex_ai/gemini-3.5-flash",
+  ],
 };
 
 export interface Turn {

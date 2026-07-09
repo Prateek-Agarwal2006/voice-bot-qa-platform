@@ -49,6 +49,16 @@ postgres:
 
 secrets:
   name: voicebot-qa-secrets
+  # Production (when secrets.postgresDsn is set) may also supply:
+  #   vertexAiProject, vertexAiLocation, gcpSaJson (service-account JSON string)
+
+# Vertex AI judge (LiteLLM vertex_ai/...). Enable and mount SA JSON when using Vertex models.
+vertex:
+  enabled: false
+  credentialsMountDir: /var/secrets
+  credentialsFileName: gcp-sa.json
+  credentialsMountPath: /var/secrets/gcp-sa.json
+  credentialsSecretKey: GCP_SA_JSON
 
 service:
   orchestrator:
