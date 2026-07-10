@@ -24,7 +24,8 @@ global:
 
 evalWorker:
   replicas: 1
-  pollIntervalSeconds: 5
+  # Backup poll only — primary wake-up is Postgres LISTEN/NOTIFY on eval_jobs.
+  pollIntervalSeconds: 60
 
 secrets:
   name: voicebot-qa-secrets

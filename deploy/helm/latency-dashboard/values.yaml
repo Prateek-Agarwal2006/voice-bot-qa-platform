@@ -30,7 +30,8 @@ probeWorkers:
 
 evalWorker:
   replicas: 1
-  pollIntervalSeconds: 5
+  # Backup poll only — primary wake-up is Postgres LISTEN/NOTIFY on eval_jobs.
+  pollIntervalSeconds: 60
 
 orchestrator:
   port: 8002

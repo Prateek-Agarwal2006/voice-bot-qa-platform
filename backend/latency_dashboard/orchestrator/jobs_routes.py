@@ -16,6 +16,7 @@ from latency_dashboard.orchestrator.upload_storage import (
     staged_path,
     validate_extension,
 )
+from latency_dashboard.pg_notify import EVAL_JOBS_CHANNEL, notify
 from latency_dashboard.postgres_client import get_pool
 from latency_dashboard.schemas import StageEventDTO
 
@@ -60,6 +61,7 @@ async def create_job(body: IngestRequest) -> JobStatusResponse:
                 """,
                 recording_id,
             )
+            await notify(conn, EVAL_JOBS_CHANNEL, recording_id)
         stages = await fetch_stages_for_recording(
             conn,
             recording_id,
@@ -141,6 +143,7 @@ async def create_upload_job(
                     """,
                     recording_id,
                 )
+                await notify(conn, EVAL_JOBS_CHANNEL, recording_id)
             stages = await fetch_stages_for_recording(
                 conn,
                 recording_id,

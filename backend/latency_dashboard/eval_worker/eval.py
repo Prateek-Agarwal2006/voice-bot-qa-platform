@@ -109,7 +109,7 @@ async def run(
         audio_bytes = await download(normalize(source_url, url_provider))
         print(f"[eval] downloaded {len(audio_bytes)} bytes, magic={audio_bytes[:8].hex()}", flush=True)
 
-        await update_recording_status(recording_id, "transcribing")
+        await update_recording_status(recording_id, "transcribing")  #while updating here we dont need lock as its already handled in collector.
         raw_scribe = transcribe_bytes(audio_bytes)
         words = words_from_scribe_payload(raw_scribe)
 
