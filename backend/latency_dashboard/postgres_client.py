@@ -9,7 +9,7 @@ _pool: asyncpg.Pool | None = None
 _SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"
 
 
-async def get_pool() -> asyncpg.Pool:
+async def get_pool() -> asyncpg.Pool:   #with connection pooling we have to make TCP connections to database again and again here we are creating a pool of connections and reusing them so only one TCP connection is made to the database and 1-10 connections are maintained in the pool.
     global _pool
     if _pool is None:
         _pool = await asyncpg.create_pool(
@@ -28,7 +28,7 @@ async def _apply_schema(pool: asyncpg.Pool) -> None:
     """
     if not _SCHEMA_PATH.exists():
         return
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn:   # .acquire() is used to acquire a connection from the pool.
         await conn.execute(_SCHEMA_PATH.read_text())
 
 

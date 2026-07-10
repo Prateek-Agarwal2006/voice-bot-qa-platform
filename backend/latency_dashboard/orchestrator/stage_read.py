@@ -14,8 +14,6 @@ STATUS_LABEL: dict[str, str] = {
     "failed": "Failed",
 }
 
-PIPELINE = ("pending", "downloading", "transcribing", "structuring", "evaluating")
-
 
 def _label(stage: str) -> str:
     return STATUS_LABEL.get(stage, stage)
@@ -40,9 +38,11 @@ def timeline_from_events(
     Status updates are written when a stage *starts*. On failure we append a
     ``failed`` event — the stage that was in progress is the last non-failed
     event and should show as failed (not completed ✓).
+
+    Recordings without stage events return an empty timeline (no legacy synthesize).
     """
     if not events:
-        return _synthesize(current_status, error_message)
+        return []
 
     failed_detail = error_message
     pipeline_events: list[dict[str, Any]] = []
@@ -90,40 +90,6 @@ def timeline_from_events(
                 at=_iso(event.get("created_at")),
             )
         )
-    return steps
-
-
-def _synthesize(status: str, error_message: str | None) -> list[StageEventDTO]:
-    """Fallback when no events exist yet (legacy rows created before stage history)."""
-    if status == "done":
-        return [
-            StageEventDTO(stage=s, state="completed", label=_label(s), at="")
-            for s in (*PIPELINE, "done")
-        ]
-    if status == "failed":
-        return [
-            StageEventDTO(
-                stage="failed",
-                state="failed",
-                label=_label("failed"),
-                detail=error_message,
-                at="",
-            )
-        ]
-    try:
-        current = PIPELINE.index(status)
-    except ValueError:
-        return [StageEventDTO(stage=status, state="active", label=_label(status), at="")]
-
-    steps: list[StageEventDTO] = []
-    for index, stage in enumerate(PIPELINE):
-        if index < current:
-            state = "completed"
-        elif index == current:
-            state = "active"
-        else:
-            state = "upcoming"
-        steps.append(StageEventDTO(stage=stage, state=state, label=_label(stage), at=""))
     return steps
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from latency_dashboard.pg_notify import RECORDING_UPDATED_CHANNEL, notify
 from latency_dashboard.postgres_client import get_pool
 
 
@@ -43,7 +42,6 @@ async def update_recording_status(
                 status,
                 error_message if status == "failed" else None,
             )
-            await notify(conn, RECORDING_UPDATED_CHANNEL, recording_id)
 
 
 async def write_conversation(recording_id: str, conversation: dict) -> None:
