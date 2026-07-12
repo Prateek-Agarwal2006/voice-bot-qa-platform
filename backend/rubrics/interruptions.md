@@ -1,9 +1,19 @@
-Score turn-taking and interruptions across the call from 0 to 10 (10 = clean turn-taking, no harmful overlap).
+> **Deterministic dimension** — scored in code from word timestamps (`eval_worker/metrics.py`), not by the Judge. This file documents the scoring policy; thresholds live in `eval_worker/constants.py`. Editing this file does not change behaviour.
 
-Primary evidence:
-- Per-word timestamps across channels in the Conversation transcript — detect overlap when Voice Bot speech starts before Customer speech ends.
-- `derived_signals.interruptions` is a hint list. Verify overlaps from word timestamps when possible.
+Interruptions measures overlapping speech and turn-taking discipline from cross-channel word timestamps:
 
-Penalize Voice Bot talking over the Customer or finishing the customer's sentence. Minor overlap during "Wait" may be less severe than sustained overlap.
+- **Bot-over-customer overlap**: word-level overlaps merged into episodes (gaps ≤ 1.0s join); total overlap seconds scored.
+- **Barge-in recovery**: when the Customer starts speaking while the bot is mid-speech, the bot should yield within 1.0s. Each failure to yield is penalised.
 
-Do not treat many short turns after barge-in as multiple failures — score overlap severity holistically from word times, not turn count.
+Scoring policy (total bot-over-customer overlap seconds):
+
+| total overlap | score |
+|---|---|
+| 0s | 10 |
+| ≤ 0.5s | 9 |
+| ≤ 1.5s | 7 |
+| ≤ 3.0s | 5 |
+| ≤ 6.0s | 3 |
+| more | 1 |
+
+Penalty: −1 per barge-in where the bot kept talking > 1.0s after customer onset (capped at −2). Floor 0.

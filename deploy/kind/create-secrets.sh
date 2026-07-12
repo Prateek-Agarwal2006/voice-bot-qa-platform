@@ -12,7 +12,7 @@ if [[ -z "${POSTGRES_DSN:-}" ]]; then
   echo "  ANTHROPIC_API_KEY     (optional — required if judge model is Anthropic)" >&2
   echo "  GEMINI_API_KEY        (optional — required if judge model is Google AI Studio)" >&2
   echo "  VERTEXAI_PROJECT      (optional — required if judge model is Vertex)" >&2
-  echo "  VERTEXAI_LOCATION     (optional — e.g. us-central1)" >&2
+  echo "  VERTEXAI_LOCATION     (optional — use 'global' to access all Gemini 2.5/3.x models)" >&2
   echo "  VERTEX_SA_JSON_FILE   (optional — path to GCP service-account JSON)" >&2
   exit 1
 fi

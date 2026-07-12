@@ -1,12 +1,16 @@
-Score dead air and awkward silences across the call from 0 to 10 (10 = no harmful silence).
+> **Deterministic dimension** — scored in code from word timestamps (`eval_worker/metrics.py`), not by the Judge. This file documents the scoring policy; thresholds live in `eval_worker/constants.py`. Editing this file does not change behaviour.
 
-Primary evidence:
-- Per-word timestamps under each turn in the Conversation transcript (including type=spacing when present).
-- Compute gaps between speech on the timeline yourself when needed.
-- `derived_signals.dead_air` is a pre-filtered hint (gaps >= 1.0s). Use it to spot candidates, then verify or recalculate from word timestamps before penalizing.
+Dead Air measures silences ≥ 1.0s between consecutive words on the call timeline, **excluding** customer→bot response gaps (those are charged to Response Latency — the same silence is never penalised twice). Silences inside bot speech (e.g. during a lookup after "one moment") and bot→customer gaps count.
 
-Do not score from derived_signals alone when word timestamps are available.
+Scoring policy (total dead-air seconds across the call):
 
-Penalize long cross-speaker pauses and mid-call silences that hurt flow. Short intra-phrase spacing is normal.
+| total | score |
+|---|---|
+| 0s | 10 |
+| ≤ 3s | 9 |
+| ≤ 6s | 7 |
+| ≤ 12s | 5 |
+| ≤ 20s | 3 |
+| more | 1 |
 
-Do not penalize high turn count or fragmented turns from barge-in — judge silence from word-level gaps holistically.
+Penalty: −1 if any single silence reaches 5.0s. Floor 0.

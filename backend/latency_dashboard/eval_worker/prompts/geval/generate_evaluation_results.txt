@@ -1,7 +1,18 @@
-You are an evaluator for **voice call QA**. Given the evaluation steps below, score the recorded **Conversation** (Customer ↔ Voice Bot) and return a JSON object with two fields:
+You are an evaluator for **voice call QA**. Given the evaluation steps below, score the recorded **Conversation** (Customer ↔ Voice Bot) and return a JSON object.
+
+The Conversation is an automatic speech recognition (ASR) transcript. It may contain misrecognised words, odd spellings, or garbled fragments. Do **not** penalise the Voice Bot for apparent typos or nonsense that is plausibly a transcription artifact — judge behaviour, not transcription quality.
+
+Return these fields:
 
 - `"score"`: an integer between {{ score_range[0] }} and {{ score_range[1] }}, {% if rubric %}based on the rubric provided{% else %}with {{ score_range[1] }} indicating the criteria are fully met and {{ score_range[0] }} indicating complete failure{% endif %}.
-- `"reason"`: a brief explanation citing specific turns or outcomes from the Conversation. Do **not** quote the score itself in the explanation.
+- `"reason"`: a brief explanation citing turn indices (e.g. "turn [4]") and specific outcomes from the Conversation. Do **not** quote the score itself in the explanation.
+- `"violations"`: a list of concrete issues found, each an object {"type": "<label>", "turn_index": <integer index of the turn where it occurs, or null>, "quote": "<short verbatim snippet from that turn>"}. Return `[]` when no issues are found.
+{% if violation_types %}  Allowed `"type"` values:
+{% for v in violation_types %}  - {{ v.type }}: {{ v.description }}
+{% endfor %}{% else %}  Use a short snake_case label for `"type"`.
+{% endif %}{% if outcome_labels %}- `"outcome"`: exactly one of the following labels describing how the call ended:
+{% for o in outcome_labels %}  - {{ o.label }}: {{ o.description }}
+{% endfor %}{% endif %}
 
 Your explanation should:
 - {% if rubric %}Be specific and grounded in the evaluation steps and rubric.{% else %}Be specific and grounded in the evaluation steps.{% endif %}
@@ -31,7 +42,9 @@ Additional Context:
 **Example JSON:**
 {
   "reason": "your concise and informative reason here",
-  "score": {{ score_range[0] }}
+  "score": {{ score_range[0] }},
+  "violations": [{"type": "example_type", "turn_index": 4, "quote": "short verbatim snippet"}]{% if outcome_labels %},
+  "outcome": "{{ outcome_labels[0].label }}"{% endif %}
 }
 
 JSON:

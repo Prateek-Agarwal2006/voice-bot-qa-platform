@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import jinja2
 from deepeval.errors import MissingTestCaseParamsError
 from deepeval.metrics import GEval
 from deepeval.metrics.base_metric import MetricTemplateMethod
-from deepeval.metrics.g_eval import schema as gschema
 from deepeval.metrics.g_eval.utils import (
     calculate_weighted_summed_score,
     format_rubrics,
@@ -23,13 +22,64 @@ from deepeval.metrics.utils import (
     trimAndLoadJson,
 )
 from deepeval.test_case import LLMTestCase
+from pydantic import BaseModel, Field
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "geval"
 _VOICE_PROMPTS = frozenset({"generate_evaluation_steps", "generate_evaluation_results"})
 
 
+class ViolationModel(BaseModel):
+    type: str
+    turn_index: Optional[int] = None
+    quote: Optional[str] = None
+
+
+class VoiceJudgeVerdict(BaseModel):
+    """Judge output: raw 0-10 score (base GEval normalises), reason, evidence, optional outcome label."""
+
+    reason: str
+    score: float
+    violations: List[ViolationModel] = Field(default_factory=list)
+    outcome: Optional[str] = None
+
+
 class VoiceGEval(GEval):
     """GEval with voice-call QA judge prompts (DeepEval measure/score logic unchanged)."""
+
+    def __init__(
+        self,
+        *args: Any,
+        violation_types: Optional[list[dict[str, str]]] = None,
+        outcome_labels: Optional[list[dict[str, str]]] = None,
+        **kwargs: Any,
+    ) -> None:
+        self.violation_types = violation_types or []
+        self.outcome_labels = outcome_labels or []
+        self.violations: list[dict[str, Any]] = []
+        self.outcome: Optional[str] = None
+        super().__init__(*args, **kwargs)
+
+    def _record_verdict_extras(self, violations: Any, outcome: Any) -> None:
+        cleaned: list[dict[str, Any]] = []
+        for item in violations or []:
+            if isinstance(item, ViolationModel):
+                cleaned.append(item.model_dump())
+            elif isinstance(item, dict) and item.get("type"):
+                cleaned.append({
+                    "type": item.get("type"),
+                    "turn_index": item.get("turn_index"),
+                    "quote": item.get("quote"),
+                })
+        self.violations = cleaned
+        self.outcome = outcome if isinstance(outcome, str) and outcome.strip() else None
+
+    def _extract_verdict_schema(self, verdict: VoiceJudgeVerdict) -> Tuple[Union[int, float], str]:
+        self._record_verdict_extras(verdict.violations, verdict.outcome)
+        return verdict.score, verdict.reason
+
+    def _extract_verdict_json(self, data: dict) -> Tuple[Union[int, float], str]:
+        self._record_verdict_extras(data.get("violations"), data.get("outcome"))
+        return data["score"], data["reason"]
 
     def _get_prompt(
         self,
@@ -83,6 +133,8 @@ class VoiceGEval(GEval):
             conversation=self._conversation_block(test_case),
             rubric=rubric_str,
             score_range=self.score_range,
+            violation_types=self.violation_types,
+            outcome_labels=self.outcome_labels,
             _additional_context=_additional_context,
             multimodal=multimodal,
         )
@@ -103,6 +155,7 @@ class VoiceGEval(GEval):
             self._accrue_cost(cost)
             accrue_token_usage(self, cost)
             data = trimAndLoadJson(res.choices[0].message.content, self)
+            self._record_verdict_extras(data.get("violations"), data.get("outcome"))
             reason = data["reason"]
             score = data["score"]
             if self.strict_mode:
@@ -115,9 +168,9 @@ class VoiceGEval(GEval):
             return await a_generate_with_schema_and_extract(
                 metric=self,
                 prompt=prompt,
-                schema_cls=gschema.ReasonScore,
-                extract_schema=lambda s: (s.score, s.reason),
-                extract_json=lambda d: (d["score"], d["reason"]),
+                schema_cls=VoiceJudgeVerdict,
+                extract_schema=self._extract_verdict_schema,
+                extract_json=self._extract_verdict_json,
             )
 
     def _evaluate(
@@ -136,6 +189,7 @@ class VoiceGEval(GEval):
             self._accrue_cost(cost)
             accrue_token_usage(self, cost)
             data = trimAndLoadJson(res.choices[0].message.content, self)
+            self._record_verdict_extras(data.get("violations"), data.get("outcome"))
             reason = data["reason"]
             score = data["score"]
             if self.strict_mode:
@@ -148,7 +202,7 @@ class VoiceGEval(GEval):
             return generate_with_schema_and_extract(
                 metric=self,
                 prompt=prompt,
-                schema_cls=gschema.ReasonScore,
-                extract_schema=lambda s: (s.score, s.reason),
-                extract_json=lambda d: (d["score"], d["reason"]),
+                schema_cls=VoiceJudgeVerdict,
+                extract_schema=self._extract_verdict_schema,
+                extract_json=self._extract_verdict_json,
             )

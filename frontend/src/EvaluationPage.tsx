@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
+  evaluationMeta,
   fetchConversation,
   fetchJob,
   fetchScores,
@@ -14,9 +15,13 @@ import { timelineFromApiStages } from "./jobStages";
 
 const DIMENSION_ORDER = [
   "task_success",
-  "conversation_quality",
+  "call_outcome",
   "response_alignment",
+  "faithfulness",
+  "conversation_quality",
+  "conversation_progression",
   "user_disappointment",
+  "sentiment_trajectory",
   "response_latency",
   "dead_air",
   "interruptions",
@@ -28,7 +33,58 @@ function scoreColor(score: number): string {
   return "var(--danger)";
 }
 
+const OUTCOME_COLOR: Record<string, string> = {
+  resolved: "var(--success)",
+  escalated: "var(--warning)",
+};
+
+function ViolationList({ dim }: { dim: DimensionScore }) {
+  if (!dim.violations || dim.violations.length === 0) return null;
+  return (
+    <>
+      <p className="section-label mb-1 mt-3">Violations</p>
+      <ul className="small text-secondary mb-0 ps-3" style={{ lineHeight: 1.55 }}>
+        {dim.violations.map((v, i) => (
+          <li key={i}>
+            <span className="mono">{v.type}</span>
+            {v.turn_index != null && <> — turn [{v.turn_index}]</>}
+            {v.quote && <> — “{v.quote}”</>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function OutcomeCard({ dimKey, dim }: { dimKey: string; dim: DimensionScore }) {
+  const outcome = dim.outcome ?? "unknown";
+  const color = OUTCOME_COLOR[outcome] ?? "var(--danger)";
+  return (
+    <div className="stat-tile score-card">
+      <div className="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <div className="label mb-1">{dim.name || dimKey}</div>
+          <div className="value" style={{ color, fontSize: "1.1rem" }}>
+            {outcome.replace(/_/g, " ")}
+          </div>
+        </div>
+        <span className="chip" style={{ fontSize: "0.7rem", padding: "3px 8px" }}>Outcome</span>
+      </div>
+
+      <p className="section-label mb-1">Reasoning</p>
+      <p className="small text-secondary mb-0" style={{ lineHeight: 1.55 }}>
+        {dim.rationale || "No rationale provided."}
+      </p>
+      <ViolationList dim={dim} />
+    </div>
+  );
+}
+
 function ScoreCard({ dimKey, dim }: { dimKey: string; dim: DimensionScore }) {
+  if (dim.outcome) {
+    return <OutcomeCard dimKey={dimKey} dim={dim} />;
+  }
+
   const display = dim.judge_score ?? dim.score * (dim.judge_score_max ?? 10);
   const max = dim.judge_score_max ?? 10;
   const pct = Math.min(100, (display / max) * 100);
@@ -46,12 +102,17 @@ function ScoreCard({ dimKey, dim }: { dimKey: string; dim: DimensionScore }) {
             </span>
           </div>
         </div>
-        <span
-          className="chip"
-          style={{ color: dim.success ? "var(--success)" : "var(--danger)", fontSize: "0.7rem", padding: "3px 8px" }}
-        >
-          {dim.success ? "Pass" : "Fail"}
-        </span>
+        <div className="d-flex gap-1">
+          {dim.metric === "deterministic" && (
+            <span className="chip" style={{ fontSize: "0.7rem", padding: "3px 8px" }}>Computed</span>
+          )}
+          <span
+            className="chip"
+            style={{ color: dim.success ? "var(--success)" : "var(--danger)", fontSize: "0.7rem", padding: "3px 8px" }}
+          >
+            {dim.success ? "Pass" : "Fail"}
+          </span>
+        </div>
       </div>
 
       <div className="score-bar-track mb-3">
@@ -62,6 +123,7 @@ function ScoreCard({ dimKey, dim }: { dimKey: string; dim: DimensionScore }) {
       <p className="small text-secondary mb-0" style={{ lineHeight: 1.55 }}>
         {dim.rationale || "No rationale provided."}
       </p>
+      <ViolationList dim={dim} />
     </div>
   );
 }
@@ -146,6 +208,8 @@ export function EvaluationPage() {
 
   const orderedDims = DIMENSION_ORDER.filter((k) => evaluation?.dimensions[k]);
   const stages = timelineFromApiStages(job?.stages);
+  const meta = evaluationMeta(evaluation);
+  const confidence = meta?.transcript_confidence;
 
   return (
     <div className="glass-card p-4">
@@ -174,6 +238,13 @@ export function EvaluationPage() {
           <div className="d-flex gap-2 flex-wrap mb-3">
             <span className="chip chip-accent">{evaluation.judge_model}</span>
             <span className="chip">{new Date(evaluation.evaluated_at).toLocaleString()}</span>
+            {confidence?.level === "low" && (
+              <span className="chip" style={{ color: "var(--warning)" }} title="Scribe language_probability below threshold — scores may be less reliable">
+                Low transcript confidence
+                {confidence.language_probability != null &&
+                  ` (${Math.round(confidence.language_probability * 100)}%)`}
+              </span>
+            )}
           </div>
           <div className="score-grid">
             {orderedDims.map((key) => (

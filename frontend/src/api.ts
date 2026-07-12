@@ -172,6 +172,12 @@ export interface Conversation {
   turn_count: number;
 }
 
+export interface Violation {
+  type: string;
+  turn_index?: number | null;
+  quote?: string | null;
+}
+
 export interface DimensionScore {
   score: number;
   score_max: number;
@@ -181,6 +187,16 @@ export interface DimensionScore {
   name: string;
   judge_score?: number;
   judge_score_max?: number;
+  violations?: Violation[];
+  outcome?: string;
+}
+
+export interface EvaluationMeta {
+  transcript_confidence?: {
+    language_probability: number | null;
+    level: string;
+  };
+  language_code?: string | null;
 }
 
 export interface Evaluation {
@@ -188,6 +204,12 @@ export interface Evaluation {
   judge_model: string;
   dimensions: Record<string, DimensionScore>;
   evaluated_at: string;
+}
+
+// "_meta" is call-level metadata stored inside the dimensions JSONB, not a dimension.
+export function evaluationMeta(evaluation: Evaluation | null): EvaluationMeta | undefined {
+  if (!evaluation) return undefined;
+  return (evaluation.dimensions as Record<string, unknown>)["_meta"] as EvaluationMeta | undefined;
 }
 
 export interface JobStatus {

@@ -1,5 +1,7 @@
 Given evaluation criteria for scoring a recorded phone Conversation (Customer ↔ Voice Bot), generate 3-4 concise evaluation steps based on the criteria below. Steps must describe how to judge the **entire Conversation** holistically — not a single Voice Bot reply or user prompt/response pair.
 
+The Conversation is an automatic speech recognition (ASR) transcript and may contain transcription errors. Steps must not direct the evaluator to penalise transcription artifacts (typos, garbled words) as Voice Bot failures, and must not ask the evaluator to recompute timing from raw timestamps — a computed timing summary is provided.
+
 {% if multimodal %}{{ _fragments.multimodal_input_rules }}{% endif %}
 
 Evaluation Criteria:

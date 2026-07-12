@@ -62,6 +62,19 @@ Orchestrator    → read Postgres → serve React dashboard
 | M10 | `runs_store.py` passthrough layer | Removed — routes import `probe_read` directly; no intermediate store module | ✅ Locked |
 | M11 | Eval completion notification | Postgres `LISTEN/NOTIFY` — Eval Worker notifies Orchestrator; Orchestrator pushes SSE to React | 🔜 Future work |
 
+### Eval scoring improvements (July 2026)
+
+| # | Decision | Choice | Status |
+|---|----------|--------|--------|
+| E1 | Rubric score anchoring | Per-band score anchors parsed from `rubrics/*.md`, passed as `rubric=` to `VoiceGEval` | 🔜 Planned |
+| E2 | Judge prompt hardening | ASR-error tolerance, anti-verbosity instruction, transcript-confidence flag | 🔜 Planned |
+| E3 | Timing dimensions scored in code | Response Latency, Dead Air, Interruptions become deterministic; judge gets a computed timing summary | 🔜 Planned |
+| E4 | Structured judge output | `violations[]` with failure-mode type, `turn_index`, and quote alongside score + reason | 🔜 Planned |
+| E5 | Dimension set expansion | Conversation Progression, Faithfulness, Call Outcome (categorical), Sentiment Trajectory | 🔜 Planned |
+| F1 | Evaluation-steps reuse (cache or hand-written steps) | Deferred | 🔜 Future work |
+| F2 | Golden set + judge calibration | Deferred | 🔜 Future work |
+| F3 | Audio-native judging (multimodal judge on customer channel) | Deferred | 🔜 Future work |
+
 ---
 
 ## LD1 — Location-agnostic Probe
@@ -675,6 +688,176 @@ Adds one background asyncio task to the Orchestrator and one SSE route. If the O
 ### When to implement
 
 After the React frontend `EvaluationsTab` and `IngestTab` are built and the basic polling flow is working end-to-end. The notification layer is an enhancement, not a prerequisite.
+
+---
+
+## E1 — Anchored rubric score bands
+
+**Q: What changes?**
+Each `rubrics/*.md` gains a `## Bands` section (e.g. `- 9–10: goal explicitly achieved and confirmed`). `load_rubric` in `metrics.py` parses the bands into DeepEval `Rubric(score_range, expected_outcome)` objects and passes them as `rubric=` to `VoiceGEval`. No new plumbing: `voice_geval.py` already calls `format_rubrics(self.rubric)` and the results template already renders a `{% if rubric %}` block — today it is always fed `None`.
+
+**Q: Why bands instead of just writing better criteria text?**
+Criteria text describes only the endpoints (what a 10 and a 0 look like). The judge invents the middle of the scale itself, and invents it differently on every call — the same conversation can score 5 one day and 7 the next for no real reason. Per-band anchors pin the whole scale. Across the judge literature (G-Eval lineage, contact-center QA scorecards, EVA), explicit score anchors are the single biggest lever for judge consistency. Bands as structured objects also get validated by DeepEval (no overlapping ranges), which prose cannot.
+
+**Q: Why keep the bands in markdown rather than Python?**
+VBE4 locked rubrics as version-controlled markdown, tunable without a code change. Bands are scoring criteria — they belong in the same file, same review process.
+
+**Q: Trade-offs?**
+- Bands **must span 0–10 exactly**: `GEval` derives `score_range` from the bands and normalises `(raw − min)/span`; `eval.py` reconstructs `judge_score = score × 10`. Bands covering e.g. only 2–10 would silently skew the displayed judge score. The parser enforces full coverage.
+- The steps-generation prompt sees only `criteria`, never the bands — auto-generated steps stay band-blind. Accepted: the scoring call (where the number is produced) sees them.
+- Slightly longer scoring prompt (~150 extra tokens per dimension).
+
+**Q: Rejected alternatives?**
+
+| Alternative | Why rejected |
+|---|---|
+| `strict_mode` (binary 0/1) | Loses granularity; also bypasses the voice template and the rubric entirely |
+| Bands as prose inside criteria | Works but unvalidated — no overlap/coverage checks, judge may ignore them among other prose |
+
+---
+
+## E2 — Judge prompt hardening
+
+**Q: What changes?**
+Three additions across the two prompt templates, the narrative rubric files, and `eval.py`:
+1. **ASR-error tolerance** — tell the judge the transcript comes from automatic speech recognition and may contain misrecognised words; do not penalise the Voice Bot for apparent typos or garbled fragments that are plausibly transcription artifacts.
+2. **Anti-verbosity instruction** — in `conversation_quality.md`: for spoken dialogue, shorter is better; do not reward longer, more elaborate bot answers.
+3. **Transcript-confidence flag** — `eval.py` reads Scribe's `language_probability`; below a threshold, a `transcript_confidence: low` field is written into the evaluation result so the UI can badge the scores as less trustworthy.
+
+**Q: Why does ASR tolerance matter?**
+"Bad transcripts → bad scores" is already listed as a known VBE4 con. Without the instruction, the judge attributes Scribe's errors to the bot — the bot gets punished for a transcription mistake it never made. τ-Voice's failure analysis found 79–90% of voice-agent failures stem from agent behaviour, not speech processing; the rubric should keep the judge focused there.
+
+**Q: Why an explicit anti-verbosity line?**
+Measured verbosity bias in LLM judges is 15–30 points in favour of longer outputs — the exact opposite of what a phone call needs. One sentence in the rubric counters a systematic bias for free.
+
+**Q: Why flag low-confidence transcripts instead of refusing to score them?**
+Blocking would strand Jobs in a state a human must clear, for a threshold that will sometimes be wrong (accents, code-switching). Flagging keeps the pipeline flowing and lets a reviewer discount the scores. The threshold lives in `constants.py`.
+
+**Q: Trade-offs?**
+The flag is advisory — nothing downstream enforces it. A few extra prompt tokens per call. Threshold needs occasional tuning for non-English traffic.
+
+---
+
+## E3 — Timing dimensions scored deterministically
+
+**Q: What changes?**
+Response Latency, Dead Air, and Interruptions stop being judge calls. `conversation.py` already computes every gap and overlap from word timestamps (`derived_signals`); new aggregate values (P50/P95 bot response latency, total dead-air seconds, total overlap seconds, interruption-recovery events) are mapped to 0–10 scores by fixed thresholds in `constants.py`, via scorer functions in `metrics.py`. `_format_timing_transcript` and the timing test case are retired. The three timing rubric `.md` files remain as human-readable documentation of the thresholds.
+
+**Q: Why take the LLM out of these three dimensions?**
+The current rubrics instruct the judge to "compute gap = first Voice Bot word start minus last Customer word end" and to "verify or recalculate from word timestamps before penalizing" — arithmetic over hundreds of timestamped words. LLMs are demonstrably unreliable at exactly this (the Talking Turns benchmark had to *train* a dedicated model on human judgments because prompted LLMs judge turn-taking poorly). They are also nondeterministic: the same Recording, re-judged, can receive different timing scores on different runs for no real reason — unacceptable for dimensions whose input is pure arithmetic. Meanwhile the platform already computes these gaps exactly, in code, before the judge ever runs. Every school of voice-bot evaluation — commercial platforms, academic benchmarks, judge methodology — converges on the same rule: deterministic where possible, LLM only where semantics are required. This also removes 6 of 14 LLM calls per Recording and makes three dimensions perfectly reproducible.
+
+**Q: Do the narrative judges lose timing context?**
+No — they keep turn-level `[start–end]` timing, and they *gain* a short computed timing summary (median/P95 latency, dead-air total, interruption count) appended to the narrative transcript. The judge consumes conclusions; the code does the arithmetic.
+
+**Q: What else gets fixed in the same change?**
+- **Double counting:** today a 5-second gap between a Customer turn and the bot's reply is penalised twice — once as response latency, once as dead air. Dead air is restricted to silences that are *not* already counted as response latency.
+- **Interruption recovery:** the current `_interruptions` only detects the bot overlapping the customer. The industry-standard complement (IHBench's entire focus) is whether the bot *yields* after a customer barge-in — continued bot speech after customer onset becomes a new derived signal and feeds the Interruptions score.
+
+**Q: Trade-offs?**
+- Thresholds are opinionated constants (e.g. "P95 latency under 4s scores ≥ 8"). They will need tuning per client and traffic profile — but a wrong threshold is visible and fixable in one line; a wrong LLM judgment is invisible.
+- No "excusable pause" logic — and that is a stance, not a gap. From the Customer's ear, silence is silence; a long backend lookup is an engineering defect (fixable with prefetching or filler speech), not something QA should forgive. The dimensions already decompose the announced-wait case correctly without any contextual intelligence: Response Latency measures the gap to the bot's *first* word (a bot that says "one moment" within 1s scores well), while Dead Air still penalises the silent stretch of the lookup itself. A contextual LLM pass over flagged segments remains possible later — as a severity-weighting knob, never as an exemption.
+
+---
+
+## E4 — Structured judge output: violations with turn citations
+
+**Q: What changes?**
+The scoring JSON gains a third field: `violations: [{type, turn_index, quote}]`. The results template requires it, a pydantic schema in `voice_geval.py` (replacing DeepEval's `ReasonScore`) parses it, `eval.py` stores it in the dimension result (JSONB — no migration), and `EvaluationPage.tsx` renders violations under each score card.
+
+**Q: Why isn't score + free-text reason enough?**
+A single paragraph of rationale is unauditable — a reviewer cannot check whether the judge actually saw what it claims without re-reading the whole transcript. Turn-index citations make every claim verifiable in one click, and named failure-mode types make failures aggregatable across Recordings ("re-asked known info in 34% of calls" — impossible with free text). This is the common pattern across EVA's judges and classic contact-center scorecards.
+
+**Q: Why failure-mode types per dimension rather than one global taxonomy?**
+Each dimension has natural modes (e.g. Response Alignment: `off_topic_reply`, `substituted_answer`, `ignored_request`). A global taxonomy forces awkward mappings and grows unbounded. Types are declared in each rubric `.md` so they version with the criteria.
+
+**Q: Trade-offs?**
+- Stricter output schema → more parse-failure surface. Mitigated: the runtime path already uses schema-constrained generation (`a_generate_with_schema_and_extract`), since logprobs are disabled on `VoiceBotJudgeModel`.
+- More output tokens per call (bounded by capping violations at ~10).
+- Frontend type + rendering change required (`api.ts`, `EvaluationPage.tsx`).
+
+---
+
+## E5 — Dimension set expansion
+
+**Q: Which dimensions are added, and why these?**
+
+| Dimension | Why |
+|---|---|
+| **Conversation Progression** | Re-asking info the Customer already gave, restating what was already said — the signature voice-bot failure mode (EVA's `information_loss` / `redundant_statements`), only vaguely covered by Conversation Quality today |
+| **Faithfulness** | Did the bot contradict itself or state unverifiable specifics as fact — adapted from EVA's faithfulness checks, minus the tool-log-dependent ones (no tool logs in Recordings) |
+| **Call Outcome** | Categorical label: `resolved / escalated / abandoned / customer_hung_up / bot_ended_incorrectly` — powers containment-rate reporting, the business metric every stakeholder asks for |
+| **Sentiment Trajectory** | Start-vs-end sentiment delta. A call that starts angry and ends satisfied is a win; the current single User Disappointment score penalises it |
+
+**Q: Why is Call Outcome categorical instead of 0–10?**
+It is a fact about the call, not a quality judgment. Forcing it onto a scale ("escalation = 4?") destroys the aggregate it exists to power. `_build_dimension_result` gets a categorical branch; the UI shows a label chip instead of a score bar.
+
+**Q: Doesn't Conversation Progression overlap Conversation Quality?**
+Partially, today — which is the problem: one broad rubric means one failure drags an unrelated score down and nothing tells you *which* behaviour failed. Conversation Quality is narrowed to flow/pacing/naturalness at the same time, so the two dimensions stop sharing territory (same per-dimension isolation argument as VBE4).
+
+**Q: Trade-offs?**
+- Each new judge dimension adds 2 LLM calls per Recording (steps + scoring) until F1 lands. Cost scales linearly with the dimension count.
+- New rubric `.md` files and `DIMENSION_ORDER` / label updates in the frontend.
+- Sentiment Trajectory partially overlaps User Disappointment; if scores track each other closely in practice, one of the two should be retired rather than kept as noise.
+
+---
+
+## F1 — Future work: evaluation-steps reuse (cache or hand-written steps)
+
+**Q: What is the issue?**
+GEval makes two LLM calls per dimension: step generation, then scoring. The step-generation call sees only the rubric criteria — never the conversation — so for a fixed rubric its "correct" output never changes. Regenerating per Recording costs 7 extra calls each time and introduces wording drift: two identical calls can be judged against slightly different steps.
+
+**Q: What are the options when picked up?**
+(a) Cache generated steps keyed on rubric-file hash (invalidates on rubric edit), or (b) hand-write steps in each rubric `.md` and pass `evaluation_steps=` so generation is skipped entirely — version-controlled and zero-variance, strictly stronger than caching.
+
+**Q: Why deferred?**
+Decision taken July 2026 to keep GEval's generation dynamics untouched while the rubric contents themselves are still churning (E1–E5). The benefit is cost and variance reduction, not correctness. Revisit once the rubric set stabilises or eval volume makes 14 calls/Recording expensive.
+
+---
+
+## F2 — Future work: golden set + judge calibration
+
+**Q: What is it?**
+A small human-labelled set of Recordings (~30–50) with expected score bands per dimension, re-run whenever a rubric or judge model changes; plus an ongoing human spot-check of a few percent of production evaluations. This is the only way to know whether a rubric edit improved anything — the judge-methodology literature reports judges drift against human judgment within 60–90 days and treats a 5–10% human spot-check as the floor.
+
+**Q: Why deferred?**
+Labelling costs human hours, and calibrating against rubrics that are about to change (E1–E5) wastes the labels. Build the golden set once the dimension set and bands have settled. Until then, the known VBE4 con stands: the Judge can disagree with humans without detection.
+
+---
+
+## F3 — Future work: audio-native judging
+
+**Q: What is it?**
+Scoring tone-sensitive dimensions (primarily User Disappointment / Sentiment Trajectory) from the audio itself via a multimodal judge (Vertex Gemini accepts audio), instead of text-only transcripts. Prosody — sighs, raised voice, flat resignation — is the strongest frustration signal and is invisible in text.
+
+**Q: What can audio directly detect that a transcript cannot?**
+
+| Category | Signals | Feeds |
+|---|---|---|
+| **Customer emotion / tone** | Sighs, groans, sharp exhales, raised voice, clipped answers; sarcasm and resignation ("great, thanks" said flatly vs genuinely — text scores both the same); audible warming-up or fed-up-ness across the call | `user_disappointment`, `sentiment_trajectory` |
+| **Bot voice quality** | Robotic TTS prosody, wrong word emphasis, unnatural mid-sentence pauses; mispronounced names / amounts / policy numbers (spoken wrongly even when the *text* was right); speaking rate too fast to follow or padded and sluggish | New potential dimension: TTS quality |
+| **Acoustic / call quality** | Clipping, choppiness, dropouts, echo of the bot's own voice; background noise on the customer side (explains ASR errors — ties into the E2 transcript-confidence flag); hold music / IVR bleed mistaken as speech by the ASR | Call-quality metadata; `_meta` |
+| **ASR verification** | A judge that *hears* the call can catch places where Scribe mis-transcribed and the text judge penalised the bot unfairly — the exact failure E2's prompt tolerance only mitigates | All text dimensions (audit) |
+
+**Q: What does audio NOT help with?**
+The timing dimensions (Response Latency, Dead Air, Interruptions). E3's deterministic word-timestamp scoring is already exact, reproducible, and free — spending audio tokens there would buy nothing.
+
+**Q: What models/tools are available (verified July 2026, `voicebotqa` project, `VERTEXAI_LOCATION=global`)?**
+
+| Tool | What it gives | Status |
+|---|---|---|
+| `vertex_ai/gemini-2.5-flash` / `gemini-3.5-flash` | Audio input + reasoning + structured JSON out — one call does "listen and score against the rubric" | ✅ Working today |
+| `vertex_ai/gemini-2.5-pro` / `gemini-3.1-pro-preview` | Same, higher accuracy, ~5–10× cost | ✅ Working today |
+| Google Chirp 3 (Speech-to-Text v2) | Cheaper transcription alternative to Scribe, word timestamps + diarization | Available in project; would replace ElevenLabs (revisits VBE2) |
+| ElevenLabs Scribe v2 | Current transcription — word timestamps only, no emotion | ✅ In pipeline |
+
+**Q: What is the implementation shape?**
+Incremental, not a rewrite. Keep the whole text pipeline as-is; add **one extra Gemini call with the customer-channel audio attached** (left channel only — customer voice, no bot) for the two emotion dimensions. LiteLLM supports audio input on `vertex_ai/` models and `judge.py` already speaks LiteLLM, so the plumbing extension is a multimodal message payload, not a new judge engine. The other 9 dimensions stay text-only and pay no audio-token cost.
+
+**Q: What has to change first?**
+The pipeline currently deletes staged upload audio *before* the evaluating stage (`delete_staged_audio` in `eval.py`); audio must be retained through judging. `judge.py` needs a multimodal generate path. Cost per evaluation rises (audio tokens are expensive) — likely gated to flagged calls rather than every Recording.
+
+**Q: Why deferred?**
+Largest change of the set, touches audio lifecycle and judge plumbing, and its value is concentrated in two dimensions. The text-side improvements (E1–E5) are cheaper and benefit all dimensions first.
 
 ---
 
